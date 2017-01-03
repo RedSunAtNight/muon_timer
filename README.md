@@ -38,6 +38,6 @@ The following provided much needed encouragement and information about the ins a
 
 * [Derek Molloy's Blog](http://derekmolloy.ie/writing-a-linux-kernel-module-part-1-introduction/)
 * [Linux Device Drivers, 3rd Edition](http://free-electrons.com/doc/books/ldd3.pdf)
-** [Linux Device Drivers, 3rd Edition Example Code](http://examples.oreilly.com/linuxdrive3)
+  * [Linux Device Drivers, 3rd Edition Example Code](http://examples.oreilly.com/linuxdrive3)
 * [Pete's Blog](http://pete.akeo.ie/2011/08/writing-linux-device-driver-for-kernels.html)
 
