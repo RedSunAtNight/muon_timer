@@ -1,7 +1,7 @@
 /*
  * Linux 2.6 and later 'muon_timer' device driver
  *
- * Copyright (c) 2017, Kevin Lynch <klynch@york.cuny.edu>
+ * Copyright (c) 2016-2017 Kevin Lynch <klynch@york.cuny.edu>
  *
  *
  * This program is free software; you can redistribute it and/or modify
