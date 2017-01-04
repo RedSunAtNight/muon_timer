@@ -2,6 +2,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include <linux/mutex.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
@@ -41,28 +42,53 @@ static int muon_major;
 static struct class *muon_class = 0;
 static struct device *muon_device = 0;
 
-// declare mutex
+// We'll allow only one process into the timer at once
+static DEFINE_MUTEX(muon_timer_mutex);
+
 // declare fifo
 
 // make pulse
 // interrupt handler
 
 // muon_timer_open
-//// grab mutex
-//// setup sysfs controls for reset and pulse and fifo clear
-//// do a reset 
-//// setup interrupts
+static int muon_timer_open(struct inode *inode, struct file *filp){
+  dbg("");
+
+  //// allow only read access; filched from parrot
+  if ( ((filp->f_flags & O_ACCMODE) == O_WRONLY)
+       || ((filp->f_flags & O_ACCMODE) == O_RDWR) ) {
+    warn("write access is prohibited\n");
+    return -EACCES;
+  }
+  
+  //// grab mutex
+  if(!mutex_trylock(&muon_timer_mutex)){
+    warn("another process is accessing the muon_timer\n");
+    return -EBUSY;
+  }
+  
+  //// setup sysfs controls for reset and pulse and fifo clear
+  //// setup interrupts
+  //// do a reset
+  return 0;
+}
+
 // muon_timer_release
-//// kill interrupts
-//// free sysfs controls
-//// release mutex
+static int muon_timer_release(struct inode *inode, struct file *filp){
+  dbg("");
+  //// kill interrupts
+  //// free sysfs controls
+  //// release mutex
+  mutex_unlock(&muon_timer_mutex);
+  return 0;
+}
 // muon_timer_read
 //// pull from fifo, "translate", and return
 
 static struct file_operations fops = {
   //  .read = muon_timer_read,
-  //  .open = muon_timer_open,
-  //  .release = muon_timer_release
+    .open = muon_timer_open,
+    .release = muon_timer_release
 };
 
 // device setup and teardown
@@ -91,34 +117,34 @@ static int __init muon_timer_init(void){
   // create device and nodes in /dev
   muon_device = device_create(muon_class, NULL, MKDEV(muon_major, 0),
 			      NULL, CLASS_NAME);
-  if(IS_ERR(muon_device)){
-    err("failed to create device '%s'\n", CLASS_NAME);
-    retval = PTR_ERR(muon_device);
-    goto failed_create;
+    if(IS_ERR(muon_device)){
+      err("failed to create device '%s'\n", CLASS_NAME);
+      retval = PTR_ERR(muon_device);
+      goto failed_create;
+    }
+
+    // setup fifo here
+    
+    return 0;
+
+  failed_create:
+    class_destroy(muon_class);
+  failed_class:
+    unregister_chrdev(muon_major, DEVICE_NAME);
+  failed_chrdev:
+    return retval;
   }
 
-  // setup fifo here
-    
-  return 0;
+  static void __exit muon_timer_exit(void){
+    dbg("");
 
- failed_create:
-  class_destroy(muon_class);
- failed_class:
-  unregister_chrdev(muon_major, DEVICE_NAME);
- failed_chrdev:
-  return retval;
-}
-
-static void __exit muon_timer_exit(void){
-  dbg("");
-
-  // tear down fifo
+    // tear down fifo
   
-  device_destroy(muon_class, MKDEV(muon_major,0));
-  class_destroy(muon_class);
-  unregister_chrdev(muon_major, DEVICE_NAME);
-}
+    device_destroy(muon_class, MKDEV(muon_major,0));
+    class_destroy(muon_class);
+    unregister_chrdev(muon_major, DEVICE_NAME);
+  }
 
 
-module_init(muon_timer_init);
-module_exit(muon_timer_exit);
+  module_init(muon_timer_init);
+  module_exit(muon_timer_exit);
