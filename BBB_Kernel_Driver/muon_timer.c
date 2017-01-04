@@ -3,7 +3,6 @@
 #include <linux/fs.h>
 #include <linux/device.h>
 
-
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
 MODULE_DESCRIPTION("An interrupt-based timing measurement driver for the BBB");
@@ -42,18 +41,29 @@ static int muon_major;
 static struct class *muon_class = 0;
 static struct device *muon_device = 0;
 
+// declare mutex
+// declare fifo
+
 // make pulse
-// setup fifo
 // interrupt handler
-// sysfs controls for reset and pulse and fifo clear
 
 // muon_timer_open
+//// grab mutex
+//// setup sysfs controls for reset and pulse and fifo clear
+//// do a reset 
+//// setup interrupts
 // muon_timer_release
+//// kill interrupts
+//// free sysfs controls
+//// release mutex
 // muon_timer_read
+//// pull from fifo, "translate", and return
 
-static struct file_operations fops = {};
-
-
+static struct file_operations fops = {
+  //  .read = muon_timer_read,
+  //  .open = muon_timer_open,
+  //  .release = muon_timer_release
+};
 
 // device setup and teardown
 
@@ -87,8 +97,8 @@ static int __init muon_timer_init(void){
     goto failed_create;
   }
 
-  // create sysfs nodes here
-  
+  // setup fifo here
+    
   return 0;
 
  failed_create:
@@ -102,6 +112,8 @@ static int __init muon_timer_init(void){
 static void __exit muon_timer_exit(void){
   dbg("");
 
+  // tear down fifo
+  
   device_destroy(muon_class, MKDEV(muon_major,0));
   class_destroy(muon_class);
   unregister_chrdev(muon_major, DEVICE_NAME);
