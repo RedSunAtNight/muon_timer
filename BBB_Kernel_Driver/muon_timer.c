@@ -30,7 +30,7 @@ static bool debug = false;
 module_param(debug, bool, S_IRUGO);
 MODULE_PARM_DESC(debug, "enable debug info (default: false)");
 ///
-static unsigned int gpio_reset  = 117; // BBB GPIO P9_25
+static unsigned int gpio_reset  = 48; // BBB GPIO P9_15
 module_param(gpio_reset, uint, S_IRUGO);
 MODULE_PARM_DESC(gpio_reset, "BBB GPIO line for latch reset output (default: 48)");
 ///
@@ -53,6 +53,20 @@ static DEFINE_MUTEX(muon_timer_mutex);
 static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
 // going to need a recovery timer, too
 // make pulse
+void do_make_pulse(unsigned pin){
+  unsigned long flags;
+
+  dbg("enter");
+  // we're bit banging ... need to disable preemption and local irqs
+  // so this doesn't take an unbounded time...
+  local_irq_save(flags);
+  gpio_set_value(pin, 1);
+  gpio_set_value(pin, 0);
+  local_irq_restore(flags);
+
+  dbg("exit");
+}
+
 // interrupt handler
 
 // muon_timer_open
@@ -103,6 +117,7 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   //// setup sysfs controls for reset and pulse and fifo clear
   //// setup interrupts
   //// do a reset
+  do_make_pulse(gpio_reset);
 
   dbg("exit");
   return 0;
