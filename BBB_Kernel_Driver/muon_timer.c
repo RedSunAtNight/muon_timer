@@ -3,6 +3,7 @@
 #include <linux/fs.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
+#include <linux/kfifo.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
@@ -10,18 +11,18 @@ MODULE_DESCRIPTION("An interrupt-based timing measurement driver for the BBB");
 MODULE_VERSION("1.0");
 
 // Macros swiped from parrot driver
-#define dbg(format, arg...) do { if (debug) pr_info(CLASS_NAME ": %s: " format , __FUNCTION__ , ## arg); } while (0)
+#define dbg(format, arg...) do { if (debug) pr_info(CLASS_NAME ": %s: \n" format , __FUNCTION__ , ## arg); } while (0)
 #define err(format, arg...) pr_err(CLASS_NAME ": " format, ## arg)
 #define info(format, arg...) pr_info(CLASS_NAME ": " format, ## arg)
 #define warn(format, arg...) pr_warn(CLASS_NAME ": " format, ## arg)
 
 #define DEVICE_NAME "muon_timer_device"
 #define CLASS_NAME "muon_timer"
-
+#define MUON_TIMER_FIFO_SIZE 1024
 
 // module parameters appear in /sys/module/muon_timer/parameters
 // add 'debug=1' on insmod to change .. 
-///
+///g
 static bool debug = false;
 module_param(debug, bool, S_IRUGO);
 MODULE_PARM_DESC(debug, "enable debug info (default: false)");
@@ -45,14 +46,14 @@ static struct device *muon_device = 0;
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
 
-// declare fifo
-
+// define fifo ... FIXME: get right type for timestamps we'll be grabbing
+static DEFINE_KFIFO(muon_timer_fifo, int, MUON_TIMER_FIFO_SIZE);
 // make pulse
 // interrupt handler
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
-  dbg("");
+  dbg("\n");
 
   //// allow only read access; filched from parrot
   if ( ((filp->f_flags & O_ACCMODE) == O_WRONLY)
@@ -75,7 +76,7 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
 // muon_timer_release
 static int muon_timer_release(struct inode *inode, struct file *filp){
-  dbg("");
+  dbg("\n");
   //// kill interrupts
   //// free sysfs controls
   //// release mutex
@@ -95,8 +96,9 @@ static struct file_operations fops = {
 
 static int __init muon_timer_init(void){
   int retval = 0;
+  int i=0;
 
-  dbg("");
+  dbg("\n");
   // Register char device and get a muon_major number
   muon_major = register_chrdev(0, DEVICE_NAME, &fops);
   if( muon_major<0 ){
@@ -117,34 +119,42 @@ static int __init muon_timer_init(void){
   // create device and nodes in /dev
   muon_device = device_create(muon_class, NULL, MKDEV(muon_major, 0),
 			      NULL, CLASS_NAME);
-    if(IS_ERR(muon_device)){
-      err("failed to create device '%s'\n", CLASS_NAME);
-      retval = PTR_ERR(muon_device);
-      goto failed_create;
-    }
+  if(IS_ERR(muon_device)){
+    err("failed to create device '%s'\n", CLASS_NAME);
+    retval = PTR_ERR(muon_device);
+    goto failed_create;
+  }
 
-    // setup fifo here
+  for(; i<10; ++i)
+    kfifo_put(&muon_timer_fifo, i);
     
-    return 0;
+  return 0;
 
-  failed_create:
-    class_destroy(muon_class);
-  failed_class:
-    unregister_chrdev(muon_major, DEVICE_NAME);
-  failed_chrdev:
-    return retval;
-  }
+ failed_create:
+  class_destroy(muon_class);
+ failed_class:
+  unregister_chrdev(muon_major, DEVICE_NAME);
+ failed_chrdev:
+  return retval;
+}
 
-  static void __exit muon_timer_exit(void){
-    dbg("");
+static void __exit muon_timer_exit(void){
+  int i;
 
-    // tear down fifo
-  
-    device_destroy(muon_class, MKDEV(muon_major,0));
-    class_destroy(muon_class);
-    unregister_chrdev(muon_major, DEVICE_NAME);
-  }
+  dbg("\n");
+
+  while( kfifo_get(&muon_timer_fifo, &i))
+    info("from muon_timer_fifo: %d\n", i);
+
+  // at this point, no other thread should exist with access to
+  // muon_timer_fifo, so reset it before we go away
+  kfifo_reset(&muon_timer_fifo);
+
+  device_destroy(muon_class, MKDEV(muon_major,0));
+  class_destroy(muon_class);
+  unregister_chrdev(muon_major, DEVICE_NAME);
+}
 
 
-  module_init(muon_timer_init);
-  module_exit(muon_timer_exit);
+module_init(muon_timer_init);
+module_exit(muon_timer_exit);
