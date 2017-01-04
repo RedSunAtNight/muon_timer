@@ -6,6 +6,7 @@
 #include <linux/kfifo.h>
 #include <linux/time.h>
 #include <linux/gpio.h>
+#include <linux/interrupt.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
@@ -45,6 +46,7 @@ MODULE_PARM_DESC(gpio_input, "BBB GPIO line for discriminated input (default: 11
 static int muon_major;
 static struct class *muon_class = 0;
 static struct device *muon_device = 0;
+static int irq;
 
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
@@ -68,6 +70,22 @@ void do_make_pulse(unsigned pin){
 }
 
 // interrupt handler
+static irq_handler_t 
+muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
+  struct timeval tv;
+
+  dbg("enter");
+
+  // get time of interrupt
+  do_gettimeofday(&tv);
+  // put it in the fifo
+  kfifo_put(&muon_timer_fifo, &tv);
+  // FIXME: schedule tasklet/workqueue
+
+  return (irq_handler_t) IRQ_HANDLED;
+
+  dbg("exit");
+}
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
@@ -116,14 +134,28 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
   //// setup sysfs controls for reset and pulse and fifo clear
   //// setup interrupts
-  //// do a reset
-  do_make_pulse(gpio_reset);
+
+  dbg("enable interrupt\n");  
+  irq = gpio_to_irq(gpio_input);
+  ret = request_irq(irq, (irq_handler_t)muon_timer_handler, 
+		    IRQF_TRIGGER_RISING, "muon_timer", NULL);
+  if( ret!=0 ){
+    warn("failed to reserve irq: %d %d\n", irq, ret);
+    goto request_irq_fail;
+  }
+
+  //// do a reset 
+  //// FIXME: could check to see if this is needed before doing it....
+  dbg("do an initial reset");
+  do_make_pulse(gpio_pulse);
 
   dbg("exit");
   return 0;
 
   // unwind correctly on error
-
+ request_irq_fail:
+  gpio_unexport(gpio_input);
+  gpio_free(gpio_input);
  gpio_input_fail:
   gpio_unexport(gpio_pulse);
   gpio_free(gpio_pulse);
@@ -140,6 +172,8 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 static int muon_timer_release(struct inode *inode, struct file *filp){
   dbg("enter");
   //// disable interrupts ... won't be in interrupt context if we get here
+  free_irq(irq, NULL);
+
   //// free sysfs controls
 
   //// release gpios
@@ -169,8 +203,6 @@ static struct file_operations fops = {
 //// FIXME: ought to test pin numbers to make sure they're sane... gpio_is_valid
 static int __init muon_timer_init(void){
   int retval = 0;
-  int i=0;
-  struct timeval tv;
 
   dbg("enter");
   // Register char device and get a muon_major number
@@ -199,11 +231,6 @@ static int __init muon_timer_init(void){
     goto failed_create;
   }
 
-  for(; i<10; ++i){
-    do_gettimeofday(&tv);
-    kfifo_put(&muon_timer_fifo, &tv);
-  }
-    
   return 0;
 
  failed_create:
