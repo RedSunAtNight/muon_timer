@@ -28,16 +28,16 @@ static bool debug = false;
 module_param(debug, bool, S_IRUGO);
 MODULE_PARM_DESC(debug, "enable debug info (default: false)");
 ///
-static int gpio_input = 115;  // BBB GPIO P9_27
-module_param(gpio_input, int, S_IRUGO);
+static unsigned int gpio_input = 115;  // BBB GPIO P9_27
+module_param(gpio_input, uint, S_IRUGO);
 MODULE_PARM_DESC(gpio_input, "BBB GPIO line for discriminated input (default: 115)");
 ///
-static int gpio_reset  = 48; // BBB GPIO ???
-module_param(gpio_reset, int, S_IRUGO);
+static unsigned int gpio_reset  = 48; // BBB GPIO ???
+module_param(gpio_reset, uint, S_IRUGO);
 MODULE_PARM_DESC(gpio_reset, "BBB GPIO line for latch reset output (default: 48)");
 ///
-static int gpio_pulse = 49; // BBB GPIO P9_23
-module_param(gpio_pulse, int, S_IRUGO);
+static unsigned int gpio_pulse = 49; // BBB GPIO P9_23
+module_param(gpio_pulse, uint, S_IRUGO);
 MODULE_PARM_DESC(gpio_pulse, "BBB GPIO line for user output (default: 49)");
 
 static int muon_major;
@@ -49,6 +49,7 @@ static DEFINE_MUTEX(muon_timer_mutex);
 
 // define fifo ... 
 static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
+// going to need a recovery timer, too
 // make pulse
 // interrupt handler
 
