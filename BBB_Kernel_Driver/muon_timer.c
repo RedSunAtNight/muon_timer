@@ -95,7 +95,7 @@ static struct file_operations fops = {
 };
 
 // device setup and teardown
-
+//// ought to test pin numbers to make sure they're sane...
 static int __init muon_timer_init(void){
   int retval = 0;
   int i=0;
