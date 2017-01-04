@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/kfifo.h>
+#include <linux/time.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
@@ -46,8 +47,8 @@ static struct device *muon_device = 0;
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
 
-// define fifo ... FIXME: get right type for timestamps we'll be grabbing
-static DEFINE_KFIFO(muon_timer_fifo, int, MUON_TIMER_FIFO_SIZE);
+// define fifo ... 
+static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
 // make pulse
 // interrupt handler
 
@@ -97,6 +98,7 @@ static struct file_operations fops = {
 static int __init muon_timer_init(void){
   int retval = 0;
   int i=0;
+  struct timeval tv;
 
   dbg("\n");
   // Register char device and get a muon_major number
@@ -125,8 +127,10 @@ static int __init muon_timer_init(void){
     goto failed_create;
   }
 
-  for(; i<10; ++i)
-    kfifo_put(&muon_timer_fifo, i);
+  for(; i<10; ++i){
+    do_gettimeofday(&tv);
+    kfifo_put(&muon_timer_fifo, &tv);
+  }
     
   return 0;
 
@@ -139,12 +143,12 @@ static int __init muon_timer_init(void){
 }
 
 static void __exit muon_timer_exit(void){
-  int i;
+  struct timeval tv;
 
   dbg("\n");
 
-  while( kfifo_get(&muon_timer_fifo, &i))
-    info("from muon_timer_fifo: %d\n", i);
+  while( kfifo_get(&muon_timer_fifo, &tv))
+    info("from muon_timer_fifo: %ld %ld\n", tv.tv_sec, tv.tv_usec);
 
   // at this point, no other thread should exist with access to
   // muon_timer_fifo, so reset it before we go away
