@@ -42,7 +42,20 @@ static int muon_major;
 static struct class *muon_class = 0;
 static struct device *muon_device = 0;
 
+// make pulse
+// setup fifo
+// interrupt handler
+// sysfs controls for reset and pulse and fifo clear
+
+// muon_timer_open
+// muon_timer_release
+// muon_timer_read
+
 static struct file_operations fops = {};
+
+
+
+// device setup and teardown
 
 static int __init muon_timer_init(void){
   int retval = 0;
@@ -73,6 +86,8 @@ static int __init muon_timer_init(void){
     retval = PTR_ERR(muon_device);
     goto failed_create;
   }
+
+  // create sysfs nodes here
   
   return 0;
 
