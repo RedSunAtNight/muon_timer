@@ -53,7 +53,6 @@ static DEFINE_MUTEX(muon_timer_mutex);
 
 // define fifo ... 
 static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
-// going to need a recovery timer, too
 // make pulse
 void do_make_pulse(unsigned pin){
   unsigned long flags;
@@ -69,6 +68,20 @@ void do_make_pulse(unsigned pin){
   dbg("exit");
 }
 
+// reset/wakeup tasklet
+void do_reset_tasklet(unsigned long data){
+  dbg("enter");
+  do_make_pulse(gpio_reset);
+  // FIXME ... need a queue for sleeping processes
+  //  wake_up_interruptible(&muon_sleep_queue)
+  // FIXME ... reschedule alarm
+  dbg("exit");
+}
+
+DECLARE_TASKLET(muon_reset_tasklet, do_reset_tasklet, 0);
+
+// going to need a recovery timer, too
+
 // interrupt handler
 static irq_handler_t 
 muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
@@ -80,11 +93,12 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
   do_gettimeofday(&tv);
   // put it in the fifo
   kfifo_put(&muon_timer_fifo, &tv);
-  // FIXME: schedule tasklet/workqueue
-
-  return (irq_handler_t) IRQ_HANDLED;
+  // schedule reset tasklet
+  tasklet_schedule(&muon_reset_tasklet);
 
   dbg("exit");
+  return (irq_handler_t) IRQ_HANDLED;
+
 }
 
 // sysfs entries to control pulse and reset lines
