@@ -87,6 +87,9 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
   dbg("exit");
 }
 
+// sysfs entries to control pulse and reset lines
+
+
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
   int ret;
@@ -131,6 +134,9 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   }
   gpio_direction_input(gpio_input);
   gpio_export(gpio_input, false);
+
+  //// clear fifo
+  kfifo_reset(&muon_timer_fifo);
 
   //// setup sysfs controls for reset and pulse and fifo clear
   //// setup interrupts
