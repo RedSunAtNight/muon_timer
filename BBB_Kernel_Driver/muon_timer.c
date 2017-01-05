@@ -53,6 +53,7 @@ static DEFINE_MUTEX(muon_timer_mutex);
 
 // define fifo ... 
 static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
+
 // make pulse
 void do_make_pulse(unsigned pin){
   unsigned long flags;
@@ -103,19 +104,25 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
 
 // sysfs entries to control pulse and reset lines
 static ssize_t sys_pulse(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+  dbg("enter");
   do_make_pulse(gpio_pulse);
+  dbg("exit")
   return 1; // return nonzero or we get called in a loop forever
 }
 
 static ssize_t sys_reset(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+  dbg("enter");
   do_make_pulse(gpio_reset);
+  dbg("exit")
   return 1;
 }
 
 static ssize_t sys_input(struct device *dev, struct device_attribute *attr, char *buf){
   int val;
 
+  dbg("enter");
   val = gpio_get_value(gpio_input);
+  dbg("exit")
   return scnprintf(buf, PAGE_SIZE, "%d\n", val);
   
 }
@@ -319,6 +326,7 @@ static int __init muon_timer_init(void){
     goto failed_create;
   }
 
+  dbg("exit");
   return 0;
 
  failed_create:
@@ -327,7 +335,7 @@ static int __init muon_timer_init(void){
   unregister_chrdev(muon_major, DEVICE_NAME);
  failed_chrdev:
 
-  dbg("exit");
+  dbg("error exit");
   return retval;
 }
 
