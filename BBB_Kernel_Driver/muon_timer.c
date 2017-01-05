@@ -88,7 +88,19 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
 }
 
 // sysfs entries to control pulse and reset lines
+static ssize_t sys_pulse(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+  do_make_pulse(gpio_pulse);
+  return 1; // return nonzero or we get called in a loop forever
+}
 
+static ssize_t sys_reset(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+  do_make_pulse(gpio_reset);
+  return 1;
+}
+
+//// declare dev_attr_pulse and dev_attr_reset 
+static DEVICE_ATTR(pulse, S_IWUSR, NULL, sys_pulse);
+static DEVICE_ATTR(reset, S_IWUSR, NULL, sys_reset);
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
@@ -120,7 +132,7 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   gpio_export(gpio_reset, false);
 
   ret = gpio_request(gpio_pulse, "gpio_pulse");
-  if( ret!=0 ){
+  if( ret ){
     warn("unable to reserve gpio_pulse: %u %d\n", gpio_pulse, ret);
     goto gpio_pulse_fail;
   }
@@ -128,17 +140,28 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   gpio_export(gpio_pulse, false);
 
   ret = gpio_request(gpio_input, "gpio_input");
-  if( ret!=0 ){
+  if( ret ){
     warn("unable to reserve gpio_input: %u %d\n", gpio_input, ret);
     goto gpio_input_fail;
   }
   gpio_direction_input(gpio_input);
   gpio_export(gpio_input, false);
 
+  //// setup sysfs controls for reset and pulse and fifo clear
+  ret = device_create_file(muon_device, &dev_attr_reset);
+  if( ret ){
+    warn("unable to create sysfs file for reset line\n");
+    goto sysfs_reset_fail;
+  } 
+  ret = device_create_file(muon_device, &dev_attr_pulse);
+  if( ret ){
+    warn("unable to create sysfs file for pulse line\n");
+    goto sysfs_pulse_fail;
+  } 
+
   //// clear fifo
   kfifo_reset(&muon_timer_fifo);
 
-  //// setup sysfs controls for reset and pulse and fifo clear
   //// setup interrupts
 
   dbg("enable interrupt\n");  
@@ -153,13 +176,17 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   //// do a reset 
   //// FIXME: could check to see if this is needed before doing it....
   dbg("do an initial reset");
-  do_make_pulse(gpio_pulse);
+  do_make_pulse(gpio_reset);
 
   dbg("exit");
   return 0;
 
   // unwind correctly on error
  request_irq_fail:
+  device_remove_file(muon_device, &dev_attr_pulse);
+ sysfs_pulse_fail:
+  device_remove_file(muon_device, &dev_attr_reset);
+ sysfs_reset_fail:
   gpio_unexport(gpio_input);
   gpio_free(gpio_input);
  gpio_input_fail:
@@ -181,6 +208,8 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   free_irq(irq, NULL);
 
   //// free sysfs controls
+  device_remove_file(muon_device, &dev_attr_pulse);
+  device_remove_file(muon_device, &dev_attr_reset);
 
   //// release gpios
   dbg("release gpios\n");
