@@ -98,9 +98,19 @@ static ssize_t sys_reset(struct device *dev, struct device_attribute *attr, cons
   return 1;
 }
 
+static ssize_t sys_input(struct device *dev, struct device_attribute *attr, char *buf){
+  int val;
+
+  val = gpio_get_value(gpio_input);
+  return scnprintf(buf, PAGE_SIZE, "%d\n", val);
+  
+}
+
 //// declare dev_attr_pulse and dev_attr_reset 
 static DEVICE_ATTR(pulse, S_IWUSR, NULL, sys_pulse);
 static DEVICE_ATTR(reset, S_IWUSR, NULL, sys_reset);
+//// declare dev_attr_input
+static DEVICE_ATTR(input, S_IRUSR, sys_input, NULL);
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
@@ -158,6 +168,11 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
     warn("unable to create sysfs file for pulse line\n");
     goto sysfs_pulse_fail;
   } 
+  ret = device_create_file(muon_device, &dev_attr_input);
+  if( ret ){
+    warn("unable to create sysfs file for input line\n");
+    goto sysfs_input_fail;
+  } 
 
   //// clear fifo
   kfifo_reset(&muon_timer_fifo);
@@ -183,6 +198,8 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
   // unwind correctly on error
  request_irq_fail:
+  device_remove_file(muon_device, &dev_attr_input);
+ sysfs_input_fail:
   device_remove_file(muon_device, &dev_attr_pulse);
  sysfs_pulse_fail:
   device_remove_file(muon_device, &dev_attr_reset);
@@ -208,6 +225,7 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   free_irq(irq, NULL);
 
   //// free sysfs controls
+  device_remove_file(muon_device, &dev_attr_input);
   device_remove_file(muon_device, &dev_attr_pulse);
   device_remove_file(muon_device, &dev_attr_reset);
 
