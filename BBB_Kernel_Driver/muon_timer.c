@@ -15,10 +15,10 @@ MODULE_VERSION("1.0");
 
 // Macros swiped from parrot driver ... 
 //// FIXME: not sure why they work inconsistently ... flushing?
-#define dbg(format, arg...) do { if (debug) pr_info(CLASS_NAME ": %s: " format , __FUNCTION__ , ## arg); } while (0)
-#define err(format, arg...) pr_err(CLASS_NAME ": " format, ## arg)
-#define info(format, arg...) pr_info(CLASS_NAME ": " format, ## arg)
-#define warn(format, arg...) pr_warn(CLASS_NAME ": " format, ## arg)
+#define dbg(format, arg...) do { if (debug) pr_info(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
+#define err(format, arg...) pr_err(CLASS_NAME ": " format "\n", ## arg)
+#define info(format, arg...) pr_info(CLASS_NAME ": " format "\n", ## arg)
+#define warn(format, arg...) pr_warn(CLASS_NAME ": " format "\n", ## arg)
 
 #define DEVICE_NAME "muon_timer_device"
 #define CLASS_NAME "muon_timer"
@@ -121,21 +121,21 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   //// allow only read access; filched from parrot
   if ( ((filp->f_flags & O_ACCMODE) == O_WRONLY)
        || ((filp->f_flags & O_ACCMODE) == O_RDWR) ) {
-    warn("write access is prohibited\n");
+    warn("write access is prohibited");
     return -EACCES;
   }
   
   //// grab mutex
   if(!mutex_trylock(&muon_timer_mutex)){
-    warn("another process is accessing the muon_timer\n");
+    warn("another process is accessing the muon_timer");
     return -EBUSY;
   }
 
   //// get gpios
-  dbg("reserve gpios\n");
+  dbg("reserve gpios");
   ret = gpio_request(gpio_reset, "gpio_reset");
-  if( ret!=0 ){
-    warn("unable to reserve gpio_reset: %u %d\n", gpio_reset, ret);
+  if( ret ){
+    err("unable to reserve gpio_reset: %u %d", gpio_reset, ret);
     goto gpio_reset_fail;
   }
   gpio_direction_output(gpio_reset, 0);
@@ -143,7 +143,7 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
   ret = gpio_request(gpio_pulse, "gpio_pulse");
   if( ret ){
-    warn("unable to reserve gpio_pulse: %u %d\n", gpio_pulse, ret);
+    err("unable to reserve gpio_pulse: %u %d", gpio_pulse, ret);
     goto gpio_pulse_fail;
   }
   gpio_direction_output(gpio_pulse, 0);
@@ -151,30 +151,32 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
   ret = gpio_request(gpio_input, "gpio_input");
   if( ret ){
-    warn("unable to reserve gpio_input: %u %d\n", gpio_input, ret);
+    err("unable to reserve gpio_input: %u %d", gpio_input, ret);
     goto gpio_input_fail;
   }
   gpio_direction_input(gpio_input);
   gpio_export(gpio_input, false);
 
+  dbg("create sysfs files");
   //// setup sysfs controls for reset and pulse and fifo clear
   ret = device_create_file(muon_device, &dev_attr_reset);
   if( ret ){
-    warn("unable to create sysfs file for reset line\n");
+    err("unable to create sysfs file for reset line");
     goto sysfs_reset_fail;
   } 
   ret = device_create_file(muon_device, &dev_attr_pulse);
   if( ret ){
-    warn("unable to create sysfs file for pulse line\n");
+    err("unable to create sysfs file for pulse line");
     goto sysfs_pulse_fail;
   } 
   ret = device_create_file(muon_device, &dev_attr_input);
   if( ret ){
-    warn("unable to create sysfs file for input line\n");
+    err("unable to create sysfs file for input line");
     goto sysfs_input_fail;
   } 
 
   //// clear fifo
+  dbg("reset fifo");
   kfifo_reset(&muon_timer_fifo);
 
   //// setup interrupts
@@ -183,8 +185,8 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   irq = gpio_to_irq(gpio_input);
   ret = request_irq(irq, (irq_handler_t)muon_timer_handler, 
 		    IRQF_TRIGGER_RISING, "muon_timer", NULL);
-  if( ret!=0 ){
-    warn("failed to reserve irq: %d %d\n", irq, ret);
+  if( ret ){
+    err("failed to reserve irq: %d %d", irq, ret);
     goto request_irq_fail;
   }
 
@@ -215,16 +217,20 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
  gpio_reset_fail:
   mutex_unlock(&muon_timer_mutex);
 
+  dbg("error exit");
   return -EBUSY;
 }
 
 // muon_timer_release
 static int muon_timer_release(struct inode *inode, struct file *filp){
   dbg("enter");
+
   //// disable interrupts ... won't be in interrupt context if we get here
+  dbg("free irq");
   free_irq(irq, NULL);
 
   //// free sysfs controls
+  dbg("free sysfs files");
   device_remove_file(muon_device, &dev_attr_input);
   device_remove_file(muon_device, &dev_attr_pulse);
   device_remove_file(muon_device, &dev_attr_reset);
@@ -261,7 +267,7 @@ static int __init muon_timer_init(void){
   // Register char device and get a muon_major number
   muon_major = register_chrdev(0, DEVICE_NAME, &fops);
   if( muon_major<0 ){
-    err("failed to register char device: error %d\n", muon_major);
+    err("failed to register char device: error %d", muon_major);
     retval = muon_major;
     goto failed_chrdev;
   }
@@ -270,7 +276,7 @@ static int __init muon_timer_init(void){
   // connect to
   muon_class = class_create(THIS_MODULE, CLASS_NAME);
   if(IS_ERR(muon_class)){
-    err("failed to register device class '%s'\n", CLASS_NAME);
+    err("failed to register device class '%s'", CLASS_NAME);
     retval = PTR_ERR(muon_class);
     goto failed_class;
   }
@@ -279,7 +285,7 @@ static int __init muon_timer_init(void){
   muon_device = device_create(muon_class, NULL, MKDEV(muon_major, 0),
 			      NULL, CLASS_NAME);
   if(IS_ERR(muon_device)){
-    err("failed to create device '%s'\n", CLASS_NAME);
+    err("failed to create device '%s'", CLASS_NAME);
     retval = PTR_ERR(muon_device);
     goto failed_create;
   }
@@ -302,7 +308,7 @@ static void __exit muon_timer_exit(void){
   dbg("enter");
 
   while( kfifo_get(&muon_timer_fifo, &tv))
-    info("from muon_timer_fifo: %ld %ld\n", tv.tv_sec, tv.tv_usec);
+    info("from muon_timer_fifo: %ld %ld", tv.tv_sec, tv.tv_usec);
 
   // at this point, no other thread should exist with access to
   // muon_timer_fifo, so reset it before we go away
