@@ -13,12 +13,12 @@ MODULE_AUTHOR("Kevin Lynch");
 MODULE_DESCRIPTION("An interrupt-based timing measurement driver for the BBB");
 MODULE_VERSION("1.0");
 
-// Macros swiped from parrot driver ... 
-//// FIXME: not sure why they work inconsistently ... flushing?
+// Macros swiped from parrot driver, with a few tweaks for consistency
 #define dbg(format, arg...) do { if (debug) pr_info(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
-#define err(format, arg...) pr_err(CLASS_NAME ": " format "\n", ## arg)
-#define info(format, arg...) pr_info(CLASS_NAME ": " format "\n", ## arg)
-#define warn(format, arg...) pr_warn(CLASS_NAME ": " format "\n", ## arg)
+#define err(format, arg...) do { pr_err(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
+#define info(format, arg...) do { pr_info(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
+#define warn(format, arg...) do { pr_warn(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
+
 
 #define DEVICE_NAME "muon_timer_device"
 #define CLASS_NAME "muon_timer"
@@ -181,7 +181,7 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
 
   //// setup interrupts
 
-  dbg("enable interrupt\n");  
+  dbg("enable interrupt");  
   irq = gpio_to_irq(gpio_input);
   ret = request_irq(irq, (irq_handler_t)muon_timer_handler, 
 		    IRQF_TRIGGER_RISING, "muon_timer", NULL);
@@ -236,7 +236,7 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   device_remove_file(muon_device, &dev_attr_reset);
 
   //// release gpios
-  dbg("release gpios\n");
+  dbg("release gpios");
   gpio_unexport(gpio_input);
   gpio_free(gpio_input);
   gpio_unexport(gpio_pulse);
@@ -259,11 +259,26 @@ static struct file_operations fops = {
 };
 
 // device setup and teardown
-//// FIXME: ought to test pin numbers to make sure they're sane... gpio_is_valid
 static int __init muon_timer_init(void){
   int retval = 0;
 
   dbg("enter");
+
+  // test pin numbers before doing any actual kernel magic
+  if( !gpio_is_valid(gpio_pulse) ){
+    err("Invalid gpio pin for pulse: %d", gpio_pulse);
+    return -1; // FIXME: probably should have better return code here
+  }
+  if( !gpio_is_valid(gpio_reset) ){
+    err("Invalid gpio pin for reset: %d", gpio_reset);
+    return -1; // FIXME: probably should have better return code here
+  }
+  if( !gpio_is_valid(gpio_input) ){
+    err("Invalid gpio pin for pulse: %d", gpio_input);
+    return -1; // FIXME: probably should have better return code here
+  }
+
+
   // Register char device and get a muon_major number
   muon_major = register_chrdev(0, DEVICE_NAME, &fops);
   if( muon_major<0 ){
