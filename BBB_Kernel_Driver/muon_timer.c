@@ -21,7 +21,7 @@ MODULE_VERSION("1.0");
 #define warn(format, arg...) do { pr_warn(CLASS_NAME ": %s: " format "\n", __FUNCTION__ , ## arg); } while (0)
 
 
-#define DEVICE_NAME "muon_timer_device"
+#define DEVICE_NAME_BASE "muon_timer"
 #define CLASS_NAME "muon_timer"
 #define MUON_TIMER_FIFO_SIZE 1024
 
@@ -53,7 +53,7 @@ static int irq;
 static DEFINE_MUTEX(muon_timer_mutex);
 
 // define fifo ... 
-static DEFINE_KFIFO(muon_timer_fifo, struct timeval, MUON_TIMER_FIFO_SIZE);
+static DEFINE_KFIFO(muon_timer_fifo, struct timespec, MUON_TIMER_FIFO_SIZE);
 
 // make pulse
 void do_make_pulse(unsigned pin){
@@ -89,18 +89,19 @@ DECLARE_TASKLET(muon_reset_tasklet, do_reset_tasklet, 0);
 // interrupt handler
 static irq_handler_t 
 muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
-  struct timeval tv;
+  struct timespec ts;
 
   dbg("enter");
 
   // get time of interrupt
-  do_gettimeofday(&tv);
+  //  do_gettimeofday(&ts);
+  getnstimeofday(&ts);
   // put it in the fifo
-  kfifo_put(&muon_timer_fifo, &tv);
+  kfifo_put(&muon_timer_fifo, &ts);
   // schedule reset tasklet
   tasklet_schedule(&muon_reset_tasklet);
 
-  dbg("interrupt: %ld %ld", tv.tv_sec, tv.tv_usec);
+  dbg("interrupt: %ld %ld", ts.tv_sec, ts.tv_nsec);
 
   dbg("exit");
   return (irq_handler_t) IRQ_HANDLED;
@@ -326,18 +327,18 @@ static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf,
     while( !kfifo_is_empty(&muon_timer_fifo) ){
       ///// if a write to the buffer will overrun end, stop draining
       dbg("fifo not empty yet");
-      if( writep + sizeof(struct timeval) - buffer >= BUFSIZE ){
+      if( writep + sizeof(struct timespec) - buffer >= BUFSIZE ){
 	dbg("get would overflow buffer");
 	break; 
       }
       ///// otherwise, space available and data to move
       dbg("fifo_get");
-      if( !kfifo_get(&muon_timer_fifo, (struct timeval*)writep) ){
+      if( !kfifo_get(&muon_timer_fifo, (struct timespec*)writep) ){
 	///// fifo can't be empty ... silencing compiler warning
 	err("kfifo_get failed!");
 	return -EFAULT;
       }
-      writep+=sizeof(struct timeval);
+      writep+=sizeof(struct timespec);
     }
   }
   // here, we have data in transfer buffer, transfer it to userspace
@@ -370,9 +371,10 @@ static int __init muon_timer_init(void){
 
   dbg("enter");
 
-  //  dbg("sizeof struct timeval %d", sizeof(struct timeval));
+  //  dbg("sizeof struct timespec %d", sizeof(struct timespec));
 
   // test pin numbers before doing any actual kernel magic
+  dbg("test gpio pins for validity");
   if( !gpio_is_valid(gpio_pulse) ){
     err("Invalid gpio pin for pulse: %d", gpio_pulse);
     return -1; // FIXME: probably should have better return code here
@@ -386,9 +388,9 @@ static int __init muon_timer_init(void){
     return -1; // FIXME: probably should have better return code here
   }
 
-
   // Register char device and get a muon_major number
-  muon_major = register_chrdev(0, DEVICE_NAME, &fops);
+  dbg("register char dev and get major number");
+  muon_major = register_chrdev(0, DEVICE_NAME_BASE, &fops);
   if( muon_major<0 ){
     err("failed to register char device: error %d", muon_major);
     retval = muon_major;
@@ -397,6 +399,7 @@ static int __init muon_timer_init(void){
 
   // Register the muon_timer virtual class ... no physical bus to
   // connect to
+  dbg("register device class");
   muon_class = class_create(THIS_MODULE, CLASS_NAME);
   if(IS_ERR(muon_class)){
     err("failed to register device class '%s'", CLASS_NAME);
@@ -405,10 +408,11 @@ static int __init muon_timer_init(void){
   }
 
   // create device and nodes in /dev
+  dbg("create device muon_timer");
   muon_device = device_create(muon_class, NULL, MKDEV(muon_major, 0),
-			      NULL, CLASS_NAME);
+			      NULL, DEVICE_NAME_BASE);
   if(IS_ERR(muon_device)){
-    err("failed to create device '%s'", CLASS_NAME);
+    err("failed to create device '%s'", DEVICE_NAME_BASE);
     retval = PTR_ERR(muon_device);
     goto failed_create;
   }
@@ -419,7 +423,7 @@ static int __init muon_timer_init(void){
  failed_create:
   class_destroy(muon_class);
  failed_class:
-  unregister_chrdev(muon_major, DEVICE_NAME);
+  unregister_chrdev(muon_major, DEVICE_NAME_BASE);
  failed_chrdev:
 
   dbg("error exit");
@@ -427,12 +431,7 @@ static int __init muon_timer_init(void){
 }
 
 static void __exit muon_timer_exit(void){
-  struct timeval tv;
-
   dbg("enter");
-
-  while( kfifo_get(&muon_timer_fifo, &tv))
-    info("from muon_timer_fifo: %ld %ld", tv.tv_sec, tv.tv_usec);
 
   // at this point, no other thread should exist with access to
   // muon_timer_fifo, so reset it before we go away
@@ -440,7 +439,7 @@ static void __exit muon_timer_exit(void){
 
   device_destroy(muon_class, MKDEV(muon_major,0));
   class_destroy(muon_class);
-  unregister_chrdev(muon_major, DEVICE_NAME);
+  unregister_chrdev(muon_major, DEVICE_NAME_BASE);
 
   dbg("exit");
 }
