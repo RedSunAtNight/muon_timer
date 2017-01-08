@@ -7,6 +7,7 @@
 #include <linux/time.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
+#include <asm/uaccess.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
@@ -69,12 +70,14 @@ void do_make_pulse(unsigned pin){
   dbg("exit");
 }
 
+// device read wait queue
+static DECLARE_WAIT_QUEUE_HEAD(read_queue);
+
 // reset/wakeup tasklet
 void do_reset_tasklet(unsigned long data){
   dbg("enter");
   do_make_pulse(gpio_reset);
-  // FIXME ... need a queue for sleeping processes
-  //  wake_up_interruptible(&muon_sleep_queue)
+  wake_up_interruptible(&read_queue);
   // FIXME ... reschedule alarm
   dbg("exit");
 }
@@ -97,6 +100,8 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
   // schedule reset tasklet
   tasklet_schedule(&muon_reset_tasklet);
 
+  dbg("interrupt: %ld %ld", tv.tv_sec, tv.tv_usec);
+
   dbg("exit");
   return (irq_handler_t) IRQ_HANDLED;
 
@@ -106,14 +111,14 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
 static ssize_t sys_pulse(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
   dbg("enter");
   do_make_pulse(gpio_pulse);
-  dbg("exit")
+  dbg("exit");
   return 1; // return nonzero or we get called in a loop forever
 }
 
 static ssize_t sys_reset(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
   dbg("enter");
   do_make_pulse(gpio_reset);
-  dbg("exit")
+  dbg("exit");
   return 1;
 }
 
@@ -122,7 +127,7 @@ static ssize_t sys_input(struct device *dev, struct device_attribute *attr, char
 
   dbg("enter");
   val = gpio_get_value(gpio_input);
-  dbg("exit")
+  dbg("exit");
   return scnprintf(buf, PAGE_SIZE, "%d\n", val);
   
 }
@@ -132,6 +137,11 @@ static DEVICE_ATTR(pulse, S_IWUSR, NULL, sys_pulse);
 static DEVICE_ATTR(reset, S_IWUSR, NULL, sys_reset);
 //// declare dev_attr_input
 static DEVICE_ATTR(input, S_IRUSR, sys_input, NULL);
+
+// This buffer is used in the read functions to do transfers to userspace
+#define BUFSIZE 4096
+char buffer[BUFSIZE];
+char *writep, *readp;
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
@@ -200,8 +210,11 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   dbg("reset fifo");
   kfifo_reset(&muon_timer_fifo);
 
-  //// setup interrupts
+  //// clear transfer buffer
+  dbg("clear transfer buffer");
+  writep = readp = buffer;
 
+  //// setup interrupts
   dbg("enable interrupt");  
   irq = gpio_to_irq(gpio_input);
   ret = request_irq(irq, (irq_handler_t)muon_timer_handler, 
@@ -270,13 +283,85 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   dbg("exit");
   return 0;
 }
-// muon_timer_read
-//// pull from fifo, "translate", and return
+
+int has_data(void) {
+  return (writep>readp || !kfifo_is_empty(&muon_timer_fifo));
+}
+
+// muon_timer_binary_read
+static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf, 
+			       size_t count, loff_t *f_pos){
+  dbg("enter");
+
+  dbg("has_data %d", has_data());
+
+  // if it's empty ...
+  while( !has_data() ){
+    // ... return immediately if non-blocking
+    dbg("check if nonblocking");
+    if(filp->f_flags & O_NONBLOCK){
+      dbg("nonblocking exit");
+      return -EAGAIN;
+    }
+    // ... otherwise, put process to sleep
+    dbg("going to wait");
+    if( wait_event_interruptible(read_queue, has_data()) ){
+      // have filesystem core restart the read
+      dbg("done waiting with signal");
+      return -ERESTARTSYS;
+    }
+    dbg("done waiting");
+  }
+
+  // If we get here, we have data to return, either already in buffer,
+  // or in fifo
+  /// refill transfer buffer if necessary
+  dbg("check transfer buffer");
+  if( writep==readp ){
+    //// reset to start of buffer
+    dbg("buffer exhausted: reset");
+    writep = readp = buffer;
+    //// fifo can't be empty here .... drain as much as possible
+    dbg("drain fifo");
+    while( !kfifo_is_empty(&muon_timer_fifo) ){
+      ///// if a write to the buffer will overrun end, stop draining
+      dbg("fifo not empty yet");
+      if( writep + sizeof(struct timeval) - buffer >= BUFSIZE ){
+	dbg("get would overflow buffer");
+	break; 
+      }
+      ///// otherwise, space available and data to move
+      dbg("fifo_get");
+      if( !kfifo_get(&muon_timer_fifo, (struct timeval*)writep) ){
+	///// fifo can't be empty ... silencing compiler warning
+	err("kfifo_get failed!");
+	return -EFAULT;
+      }
+      writep+=sizeof(struct timeval);
+    }
+  }
+  // here, we have data in transfer buffer, transfer it to userspace
+  dbg("return data to userspace");
+  dbg("count requested: %d", count);
+  dbg("count available: %d", (size_t)(writep-readp));
+  count = min(count, (size_t)(writep-readp)); // don't try too hard
+  dbg("count to return: %d", count);
+  if( copy_to_user(buf, readp, count) ){
+    /// something went wrong ...
+    err("something went wrong in copy_to_user");
+    return -EFAULT;
+  }
+  readp+=count;
+
+  dbg("exit");
+
+  return count;  
+}
 
 static struct file_operations fops = {
-  //  .read = muon_timer_read,
-    .open = muon_timer_open,
-    .release = muon_timer_release
+  .read = muon_timer_binary_read,
+  .open = muon_timer_open,
+  .release = muon_timer_release
 };
 
 // device setup and teardown
@@ -284,6 +369,8 @@ static int __init muon_timer_init(void){
   int retval = 0;
 
   dbg("enter");
+
+  //  dbg("sizeof struct timeval %d", sizeof(struct timeval));
 
   // test pin numbers before doing any actual kernel magic
   if( !gpio_is_valid(gpio_pulse) ){
