@@ -30,10 +30,9 @@ service (of c-type `struct timespec`) and schedules a reset of the
 latch via an additional GPIO pin.  Access to a second output pin is
 provided by the driver, primarily for testing and debugging purposes.
 Control of the pins is provided through sysfs.  Readout of the
-timestamp data stream is provided through /dev/muon_timer (for binary
-mode) or /dev/muon_timer_txt (for text mode).  Access to only one of
-these device nodes is provided at once; similarly, only one process
-may be accessing the device at any time.
+timestamp data stream is provided through /dev/muon_timer, which
+provides the binary `struct timespec`.  Only one process may be
+accessing the device at any time.
 
 ## Usage Examples
 
