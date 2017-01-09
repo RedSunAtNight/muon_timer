@@ -339,6 +339,7 @@ static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf,
 	return -EFAULT;
       }
       writep+=sizeof(struct timespec);
+
     }
   }
   // here, we have data in transfer buffer, transfer it to userspace
@@ -353,6 +354,7 @@ static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf,
     return -EFAULT;
   }
   readp+=count;
+  *f_pos += count;
 
   dbg("exit");
 
@@ -360,6 +362,7 @@ static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf,
 }
 
 static struct file_operations binary_fops = {
+  .owner = THIS_MODULE,
   .read = muon_timer_binary_read,
   .open = muon_timer_open,
   .release = muon_timer_release
