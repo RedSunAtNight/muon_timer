@@ -359,7 +359,7 @@ static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf,
   return count;  
 }
 
-static struct file_operations fops = {
+static struct file_operations binary_fops = {
   .read = muon_timer_binary_read,
   .open = muon_timer_open,
   .release = muon_timer_release
@@ -388,15 +388,6 @@ static int __init muon_timer_init(void){
     return -1; // FIXME: probably should have better return code here
   }
 
-  // Register char device and get a muon_major number
-  dbg("register char dev and get major number");
-  muon_major = register_chrdev(0, DEVICE_NAME_BASE, &fops);
-  if( muon_major<0 ){
-    err("failed to register char device: error %d", muon_major);
-    retval = muon_major;
-    goto failed_chrdev;
-  }
-
   // Register the muon_timer virtual class ... no physical bus to
   // connect to
   dbg("register device class");
@@ -407,6 +398,15 @@ static int __init muon_timer_init(void){
     goto failed_class;
   }
 
+  // Register char device and get a muon_major number
+  dbg("register binary char dev and get major number");
+  muon_major = register_chrdev(0, DEVICE_NAME_BASE, &binary_fops);
+  if( muon_major<0 ){
+    err("failed to register char device: error %d", muon_major);
+    retval = muon_major;
+    goto failed_chardev;
+  }
+
   // create device and nodes in /dev
   dbg("create device muon_timer");
   muon_device = device_create(muon_class, NULL, MKDEV(muon_major, 0),
@@ -414,17 +414,17 @@ static int __init muon_timer_init(void){
   if(IS_ERR(muon_device)){
     err("failed to create device '%s'", DEVICE_NAME_BASE);
     retval = PTR_ERR(muon_device);
-    goto failed_create;
+    goto failed_dev;
   }
 
   dbg("exit");
   return 0;
 
- failed_create:
+ failed_dev:
+  unregister_chrdev(muon_major, DEVICE_NAME_BASE);
+ failed_chardev:
   class_destroy(muon_class);
  failed_class:
-  unregister_chrdev(muon_major, DEVICE_NAME_BASE);
- failed_chrdev:
 
   dbg("error exit");
   return retval;
