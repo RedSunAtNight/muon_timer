@@ -55,6 +55,8 @@ static struct device *muon_device = 0;
 static int irq;
 static int timeout_jiffies;
 
+
+
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
 
@@ -62,7 +64,7 @@ static DEFINE_MUTEX(muon_timer_mutex);
 static DEFINE_KFIFO(muon_timer_fifo, struct timespec, MUON_TIMER_FIFO_SIZE);
 
 // make pulse
-void do_make_pulse(unsigned pin){
+static void do_make_pulse(unsigned pin){
   unsigned long flags;
 
   dbg("enter");
@@ -80,11 +82,11 @@ void do_make_pulse(unsigned pin){
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
 
 // device timer
-void do_timer_expired(unsigned long u);
+static void do_timer_expired(unsigned long u);
 static struct timer_list timer = TIMER_INITIALIZER(do_timer_expired, 0, 0);
 
 // timer function
-void do_timer_expired(unsigned long u){
+static void do_timer_expired(unsigned long u){
   dbg("enter");
   warn("timer expired!");
   if( gpio_get_value(gpio_input) ){
@@ -97,7 +99,7 @@ void do_timer_expired(unsigned long u){
 }
 
 // reset/wakeup tasklet
-void do_reset_tasklet(unsigned long data){
+static void do_reset_tasklet(unsigned long data){
   dbg("enter");
   dbg("make reset pulse");
   do_make_pulse(gpio_reset);
@@ -108,7 +110,7 @@ void do_reset_tasklet(unsigned long data){
   dbg("exit");
 }
 
-DECLARE_TASKLET(muon_reset_tasklet, do_reset_tasklet, 0);
+static DECLARE_TASKLET(muon_reset_tasklet, do_reset_tasklet, 0);
 
 // going to need a recovery timer, too
 
@@ -167,8 +169,8 @@ static DEVICE_ATTR(input, S_IRUSR, sys_input, NULL);
 
 // This buffer is used in the read functions to do transfers to userspace
 #define BUFSIZE 4096
-char buffer[BUFSIZE];
-char *writep, *readp;
+static char buffer[BUFSIZE];
+static char *writep, *readp;
 
 // muon_timer_open
 static int muon_timer_open(struct inode *inode, struct file *filp){
@@ -320,7 +322,7 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   return 0;
 }
 
-int has_data(void) {
+static int has_data(void) {
   return (writep>readp || !kfifo_is_empty(&muon_timer_fifo));
 }
 
