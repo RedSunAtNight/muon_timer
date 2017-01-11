@@ -1,0 +1,1 @@
+KERNEL=="muon_timer", GROUP="muons", MODE="0440"
