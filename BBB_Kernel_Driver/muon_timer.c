@@ -146,14 +146,14 @@ static ssize_t sys_pulse(struct device *dev, struct device_attribute *attr, cons
   dbg("enter");
   do_make_pulse(gpio_pulse);
   dbg("exit");
-  return 1; // return nonzero or we get called in a loop forever
+  return count;
 }
 
 static ssize_t sys_reset(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
   dbg("enter");
   do_make_pulse(gpio_reset);
   dbg("exit");
-  return 1;
+  return count;
 }
 
 static ssize_t sys_input(struct device *dev, struct device_attribute *attr, char *buf){
