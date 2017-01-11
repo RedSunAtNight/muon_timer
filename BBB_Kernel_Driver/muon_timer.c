@@ -54,8 +54,8 @@ static struct class *muon_class = 0;
 static struct device *muon_device = 0;
 static int irq;
 static int timeout_jiffies;
-
-
+// for accounting data
+static int cur_ints, cur_missed, tot_ints, tot_missed;
 
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
@@ -92,6 +92,8 @@ static void do_timer_expired(unsigned long u){
   if( gpio_get_value(gpio_input) ){
     err("missed an interrupt!  Input high ... resetting");
     do_make_pulse(gpio_reset);
+    ++cur_missed;
+    ++tot_missed;
   }
   dbg("reset timer");
   mod_timer(&timer, jiffies+timeout_jiffies);
@@ -128,6 +130,9 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
   kfifo_put(&muon_timer_fifo, &ts);
   // schedule reset tasklet
   tasklet_schedule(&muon_reset_tasklet);
+  // accounting
+  ++cur_ints;
+  ++tot_ints;
 
   dbg("interrupt: %ld %ld", ts.tv_sec, ts.tv_nsec);
 
@@ -161,11 +166,42 @@ static ssize_t sys_input(struct device *dev, struct device_attribute *attr, char
   
 }
 
+// sysfs entries for accounting
+static ssize_t sys_print_int(struct device *dev, struct device_attribute *attr, char *buf, int val){
+  dbg("enter");
+  dbg("exit");
+  return scnprintf(buf, PAGE_SIZE, "%d\n", val);
+}
+static ssize_t sys_cur_ints(struct device *dev, struct device_attribute *attr, char *buf){
+  dbg("enter");
+  dbg("exit");
+  return sys_print_int(dev, attr, buf, cur_ints);
+}
+static ssize_t sys_cur_missed(struct device *dev, struct device_attribute *attr, char *buf){
+  dbg("enter");
+  dbg("exit");
+  return sys_print_int(dev, attr, buf, cur_missed);
+}
+static ssize_t sys_tot_ints(struct device *dev, struct device_attribute *attr, char *buf){
+  dbg("enter");
+  dbg("exit");
+  return sys_print_int(dev, attr, buf, tot_ints);
+}
+static ssize_t sys_tot_missed(struct device *dev, struct device_attribute *attr, char *buf){
+  dbg("enter");
+  dbg("exit");
+  return sys_print_int(dev, attr, buf, tot_missed);
+}
+
 //// declare dev_attr_pulse and dev_attr_reset 
 static DEVICE_ATTR(pulse, S_IWUSR, NULL, sys_pulse);
 static DEVICE_ATTR(reset, S_IWUSR, NULL, sys_reset);
 //// declare dev_attr_input
-static DEVICE_ATTR(input, S_IRUSR, sys_input, NULL);
+static DEVICE_ATTR(input, S_IRUGO, sys_input, NULL);
+static DEVICE_ATTR(current_interrupts, S_IRUGO, sys_cur_ints, NULL);
+static DEVICE_ATTR(current_missed, S_IRUGO, sys_cur_missed, NULL);
+static DEVICE_ATTR(total_interrupts, S_IRUGO, sys_tot_ints, NULL);
+static DEVICE_ATTR(total_missed, S_IRUGO, sys_tot_missed, NULL);
 
 // This buffer is used in the read functions to do transfers to userspace
 #define BUFSIZE 4096
@@ -190,6 +226,10 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
     warn("another process is accessing the muon_timer");
     return -EBUSY;
   }
+
+  //// reset accounting
+  dbg("resetting accounting data");
+  cur_ints = cur_missed = 0;
 
   //// get gpios
   dbg("reserve gpios");
@@ -459,9 +499,42 @@ static int __init muon_timer_init(void){
     goto failed_dev;
   }
 
+  // sysfs nodes
+  dbg("create sysfs nodes");
+  retval = device_create_file(muon_device, &dev_attr_current_interrupts);
+  if( retval ){
+    err("unable to create sysfs file for current interrupt accounting");
+    goto failed_sysfs_cur_ints;
+  } 
+  retval = device_create_file(muon_device, &dev_attr_current_missed);
+  if( retval ){
+    err("unable to create sysfs file for current missed interrupt accounting");
+    goto failed_sysfs_cur_missed;
+  } 
+  retval = device_create_file(muon_device, &dev_attr_total_interrupts);
+  if( retval ){
+    err("unable to create sysfs file for total interrupt accounting");
+    goto failed_sysfs_tot_ints;
+  } 
+  retval = device_create_file(muon_device, &dev_attr_total_missed);
+  if( retval ){
+    err("unable to create sysfs file for total missed interrupt accounting");
+    goto failed_sysfs_tot_missed;
+  } 
+
+  tot_ints = tot_missed = 0;
+
   dbg("exit");
   return 0;
 
+ failed_sysfs_tot_missed:
+  device_remove_file(muon_device, &dev_attr_total_interrupts);
+ failed_sysfs_tot_ints:
+  device_remove_file(muon_device, &dev_attr_current_missed);
+ failed_sysfs_cur_missed:
+  device_remove_file(muon_device, &dev_attr_current_interrupts);
+ failed_sysfs_cur_ints:
+  device_destroy(muon_class, MKDEV(muon_major,0));
  failed_dev:
   unregister_chrdev(muon_major, DEVICE_NAME_BASE);
  failed_chardev:
@@ -478,6 +551,11 @@ static void __exit muon_timer_exit(void){
   // at this point, no other thread should exist with access to
   // muon_timer_fifo, so reset it before we go away
   kfifo_reset(&muon_timer_fifo);
+
+  device_remove_file(muon_device, &dev_attr_total_missed);
+  device_remove_file(muon_device, &dev_attr_total_interrupts);
+  device_remove_file(muon_device, &dev_attr_current_missed);
+  device_remove_file(muon_device, &dev_attr_current_interrupts);
 
   device_destroy(muon_class, MKDEV(muon_major,0));
   class_destroy(muon_class);
