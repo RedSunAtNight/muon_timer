@@ -7,6 +7,7 @@
 #include <linux/time.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
+#include <linux/timer.h>
 #include <asm/uaccess.h>
 
 MODULE_LICENSE("GPL");
@@ -27,7 +28,7 @@ MODULE_VERSION("1.0");
 
 // module parameters appear in /sys/module/muon_timer/parameters
 // add 'debug=1' on insmod to change .. 
-///g
+///
 static bool debug = false;
 module_param(debug, bool, S_IRUGO);
 MODULE_PARM_DESC(debug, "enable debug info (default: false)");
@@ -43,11 +44,16 @@ MODULE_PARM_DESC(gpio_pulse, "BBB GPIO line for user output (default: 49)");
 static unsigned int gpio_input = 115;  // BBB GPIO P9_27
 module_param(gpio_input, uint, S_IRUGO);
 MODULE_PARM_DESC(gpio_input, "BBB GPIO line for discriminated input (default: 115)");
+/// muon timer timeout in seconds
+static int timer_timeout = 5;
+module_param(timer_timeout, uint, S_IRUGO);
+MODULE_PARM_DESC(timer_timeout, "Timeout in seconds for interrupt loss monitor timer in seconds (default: 5)");
 
 static int muon_major;
 static struct class *muon_class = 0;
 static struct device *muon_device = 0;
 static int irq;
+static int timeout_jiffies;
 
 // We'll allow only one process into the timer at once
 static DEFINE_MUTEX(muon_timer_mutex);
@@ -73,12 +79,32 @@ void do_make_pulse(unsigned pin){
 // device read wait queue
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
 
+// device timer
+void do_timer_expired(unsigned long u);
+static struct timer_list timer = TIMER_INITIALIZER(do_timer_expired, 0, 0);
+
+// timer function
+void do_timer_expired(unsigned long u){
+  dbg("enter");
+  warn("timer expired!");
+  if( gpio_get_value(gpio_input) ){
+    err("missed an interrupt!  Input high ... resetting");
+    do_make_pulse(gpio_reset);
+  }
+  dbg("reset timer");
+  mod_timer(&timer, jiffies+timeout_jiffies);
+  dbg("exit");
+}
+
 // reset/wakeup tasklet
 void do_reset_tasklet(unsigned long data){
   dbg("enter");
+  dbg("make reset pulse");
   do_make_pulse(gpio_reset);
+  dbg("wake_up");
   wake_up_interruptible(&read_queue);
-  // FIXME ... reschedule alarm
+  dbg("reset timer");
+  mod_timer(&timer, jiffies+timeout_jiffies);
   dbg("exit");
 }
 
@@ -215,6 +241,11 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   dbg("clear transfer buffer");
   writep = readp = buffer;
 
+  //// setup the timer
+  dbg("enable timer");
+  timer.expires = jiffies + timeout_jiffies;
+  add_timer(&timer);
+
   //// setup interrupts
   dbg("enable interrupt");  
   irq = gpio_to_irq(gpio_input);
@@ -263,6 +294,10 @@ static int muon_timer_release(struct inode *inode, struct file *filp){
   //// disable interrupts ... won't be in interrupt context if we get here
   dbg("free irq");
   free_irq(irq, NULL);
+
+  //// remove timer
+  dbg("remove timer");
+  del_timer_sync(&timer);
 
   //// free sysfs controls
   dbg("free sysfs files");
@@ -375,6 +410,8 @@ static int __init muon_timer_init(void){
   dbg("enter");
 
   //  dbg("sizeof struct timespec %d", sizeof(struct timespec));
+  timeout_jiffies = timer_timeout*HZ;
+  dbg("timeout_jiffies: %d", HZ);
 
   // test pin numbers before doing any actual kernel magic
   dbg("test gpio pins for validity");
