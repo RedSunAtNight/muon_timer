@@ -194,8 +194,9 @@ static ssize_t sys_tot_missed(struct device *dev, struct device_attribute *attr,
 }
 
 //// declare dev_attr_pulse and dev_attr_reset 
-static DEVICE_ATTR(pulse, S_IWUSR, NULL, sys_pulse);
-static DEVICE_ATTR(reset, S_IWUSR, NULL, sys_reset);
+///// these should be S_IWUSR | S_IWGRP for group muons, but I can't seem to convince udev to make the appropriate changes
+static DEVICE_ATTR(pulse, S_IWUGO, NULL, sys_pulse);
+static DEVICE_ATTR(reset, S_IWUGO, NULL, sys_reset);
 //// declare dev_attr_input
 static DEVICE_ATTR(input, S_IRUGO, sys_input, NULL);
 static DEVICE_ATTR(current_interrupts, S_IRUGO, sys_cur_ints, NULL);
