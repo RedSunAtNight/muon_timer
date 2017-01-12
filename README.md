@@ -44,17 +44,23 @@ interface to kfifo seems to be slightly different; have not
 investigated this issue.
 
 Currently, installation is manual and error prone:
+1. Create a group muons and add users that need this device to that
+group 
+1. Copy the udev rules file to the appropriate place in /etc
 1. Install kernel module build tools.
 1. Run 'make' in the BBB_Kernel_Driver subdirectory to build the
 kernel module
 1. Manual install as root via 'insmod muon_timer.ko'.  Check the code
-comments for load time options (debug, pin remappings, etc)
+comments for load time options (debug, pin remappings, etc); this part
+can, of course, be automated at boot time depending on your
+distribution. 
 
-Eventually, we will have udev support and (hopefully) better
+Eventually, we will have (full) udev support and (hopefully) better
 installation support, since we need that anyway.  At this time,
-because of the lack of udev support, you are restricted to controlling
-the 'device' as root.  But, as long as it 'works' well enough for our
-project, installation will likely never be terribly polished.
+because of the lack of correct udev support, permissions are looser
+than one might strictly prefer.  But, as long as it 'works' well
+enough for our project, installation will likely never be terribly
+polished.
 
 ## Tests
 
