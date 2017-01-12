@@ -300,7 +300,6 @@ static int muon_timer_open(struct inode *inode, struct file *filp){
   }
 
   //// do a reset 
-  //// FIXME: could check to see if this is needed before doing it....
   dbg("do an initial reset");
   do_make_pulse(gpio_reset);
 
@@ -460,15 +459,15 @@ static int __init muon_timer_init(void){
   dbg("test gpio pins for validity");
   if( !gpio_is_valid(gpio_pulse) ){
     err("Invalid gpio pin for pulse: %d", gpio_pulse);
-    return -1; // FIXME: probably should have better return code here
+    return -EINVAL;
   }
   if( !gpio_is_valid(gpio_reset) ){
     err("Invalid gpio pin for reset: %d", gpio_reset);
-    return -1; // FIXME: probably should have better return code here
+    return -EINVAL;
   }
   if( !gpio_is_valid(gpio_input) ){
     err("Invalid gpio pin for pulse: %d", gpio_input);
-    return -1; // FIXME: probably should have better return code here
+    return -EINVAL;
   }
 
   // Register the muon_timer virtual class ... no physical bus to
