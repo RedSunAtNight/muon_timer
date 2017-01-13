@@ -1,13 +1,16 @@
-import time
+import time, select
 
 
 f = open('/dev/muon_timer', 'rb')
 
-time.sleep(10)
+#time.sleep(10)
 
-d = f.read(8)
+inputs = [f]
+outputs = []
 
-print(d)
+readable, writeable, exceptional = select.select(inputs, outputs, inputs)
+
+print(readable)
 
 f.close()
 

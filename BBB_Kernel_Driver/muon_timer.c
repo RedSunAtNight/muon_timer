@@ -370,12 +370,17 @@ static int has_data(void) {
 // muon_timer_poll
 static unsigned int muon_timer_poll(struct file *filp, poll_table *wait){
   unsigned mask = 0;
+  dbg("enter");
 
+  dbg("poll wait");
   poll_wait(filp, &read_queue, wait);
   if( has_data() ){
     // then we're readable
+    dbg("readable ... set mask");
     mask |= POLLIN | POLLRDNORM;
   }
+
+  dbg("exit");
   return mask;
 }
 
