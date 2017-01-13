@@ -472,7 +472,7 @@ static int __init muon_timer_init(void){
 
   //  dbg("sizeof struct timespec %d", sizeof(struct timespec));
   timeout_jiffies = timer_timeout*HZ;
-  dbg("timeout_jiffies: %d", HZ);
+  dbg("timeout_jiffies: %d", timeout_jiffies);
 
   // test pin numbers before doing any actual kernel magic
   dbg("test gpio pins for validity");
