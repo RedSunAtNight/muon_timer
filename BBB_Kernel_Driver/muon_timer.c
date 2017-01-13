@@ -8,6 +8,7 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 
 MODULE_LICENSE("GPL");
@@ -366,9 +367,21 @@ static int has_data(void) {
   return (writep>readp || !kfifo_is_empty(&muon_timer_fifo));
 }
 
+// muon_timer_poll
+static unsigned int muon_timer_poll(struct file *filp, poll_table *wait){
+  unsigned mask = 0;
+
+  poll_wait(filp, &read_queue, wait);
+  if( has_data() ){
+    // then we're readable
+    mask |= POLLIN | POLLRDNORM;
+  }
+  return mask;
+}
+
 // muon_timer_binary_read
 static ssize_t muon_timer_binary_read(struct file *filp, char __user *buf, 
-			       size_t count, loff_t *f_pos){
+				      size_t count, loff_t *f_pos){
   dbg("enter");
 
   dbg("has_data %d", has_data());
@@ -442,7 +455,8 @@ static struct file_operations binary_fops = {
   .owner = THIS_MODULE,
   .read = muon_timer_binary_read,
   .open = muon_timer_open,
-  .release = muon_timer_release
+  .release = muon_timer_release,
+  .poll = muon_timer_poll
 };
 
 // device setup and teardown
