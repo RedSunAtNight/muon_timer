@@ -31,10 +31,12 @@ latch via an additional GPIO pin.  Access to a second output pin is
 provided by the driver, primarily for testing and debugging purposes.
 Control of the pins is provided through sysfs.  Readout of the
 timestamp data stream is provided through /dev/muon_timer, which
-provides the binary `struct timespec`.  Only one process may be
-accessing the device at any time.
+provides a FIFO of binary `struct timespec` objects.  Only one process
+may be accessing the device at any time.
 
 ## Usage Examples
+
+See examples in directory `examples`.
 
 ## Installation
 
@@ -51,24 +53,24 @@ group
 1. Install kernel module build tools.
 1. Run 'make' in the BBB_Kernel_Driver subdirectory to build the
 kernel module
-1. Manual install as root via 'insmod muon_timer.ko'.  Check the code
+1. Manually load as root via 'insmod muon_timer.ko'.  Check the code
 comments for load time options (debug, pin remappings, etc); this part
 can, of course, be automated at boot time depending on your
 distribution. 
 
 Eventually, we will have (full) udev support and (hopefully) better
-installation support, since we need that anyway.  At this time,
-because of the lack of correct udev support, permissions are looser
-than one might strictly prefer.  But, as long as it 'works' well
-enough for our project, installation will likely never be terribly
-polished.
+installation support, since we need that ourselves anyway.  At this
+time, because of the lack of udev support for user and group ownership
+of sysfs nodes, permissions are looser than one might strictly prefer.
+But, as long as it 'works' well enough for our project, installation
+will likely never be terribly polished.
 
-## Tests
+## Tests and examples
 
-The test_muon_timer.py code performs tests of the driver.  If the
-driver is loaded with the 'debug=1' option, significant additional
-information on the operation of the driver will be output to the
-kernel log.
+There are a number of test and example programs in the `tests` and
+`examples` directories.  If the driver is loaded with the 'debug=1'
+option, significant additional information on the operation of the
+driver will be output to the kernel log.
 
 ## Contributors
 
