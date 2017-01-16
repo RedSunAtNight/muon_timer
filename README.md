@@ -44,6 +44,7 @@ interface to kfifo seems to be slightly different; have not
 investigated this issue.
 
 Currently, installation is manual and error prone:
+
 1. Create a group muons and add users that need this device to that
 group 
 1. Copy the udev rules file to the appropriate place in /etc
