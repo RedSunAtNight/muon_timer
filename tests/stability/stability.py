@@ -1,5 +1,8 @@
 from __future__ import absolute_import, division, print_function
 
+# This test code runs in "self triggering" mode; connect the pulse
+# gpio output to the input gpio input before running.
+
 import time
 from ctypes import *
 
