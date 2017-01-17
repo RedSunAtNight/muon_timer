@@ -3,6 +3,10 @@ from __future__ import absolute_import, division, print_function
 # This test code runs in "self triggering" mode; connect the pulse
 # gpio output to the input gpio input before running.
 
+# If you plan on piping the output somewhere, you must run the
+# interpreter with the -u flag (unbuffered stdio), or else it will sit
+# forever before doing anything
+
 import time
 from ctypes import *
 
