@@ -53,10 +53,19 @@ group
 1. Install kernel module build tools.
 1. Run 'make' in the BBB_Kernel_Driver subdirectory to build the
 kernel module
-1. Manually load as root via 'insmod muon_timer.ko'.  Check the code
-comments for load time options (debug, pin remappings, etc); this part
-can, of course, be automated at boot time depending on your
-distribution. 
+1. To test the driver, manually load as root via 'insmod
+muon_timer.ko'.  Check the code comments for load time options (debug,
+pin remappings, etc); this part can, of course, be automated at boot
+time depending on your distribution.
+
+To automate the module loading at boot time (on debian wheezy at
+least), do the following
+
+1. As root, create a directory `/lib/modules/$(uname -r)/muon_timer`.
+1. Copy the module ko file to that directory.
+1. Run `depmod` as root to recreate the module dependency tree.
+1. Copy the contents of `modules-load.d` to `/etc/modules-load.d`.
+1. Reboot and check that the driver has been loaded with `lsmod`.
 
 Eventually, we will have (full) udev support and (hopefully) better
 installation support, since we need that ourselves anyway.  At this
