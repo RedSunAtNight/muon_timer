@@ -6,25 +6,25 @@ if [ $(whoami) == 'root' ]; then
 	echo 'Exiting'
 	exit 0
 else
-	echo 'Running under correct permissions'.
+	echo "muon_timer will be installed under user $(whoami)"
 fi
+
+echo 'Checking dependencies...'
+pkgName=linux-headers-$(uname -r)
+dpkg-query -l $pkgName
+if [ $? != '0' ]; then
+	echo "Missing dependency: linux-headers-$(uname -r)"
+	echo 'Please install this package.'
+	exit 1
+else 
+	echo "linux-headers-$(uname -r) is installed"
+fi
+
+initialDir=$(pwd)
 
 futureUser=$(whoami)
 baseDir=$(pwd)
-loadOnBoot=true
-
-ans='k'
-echo "Expect that muon_timer will be used by user $futureUser. Is this correct? [y/n] "
-read -e ans
-while [[ "$ans" != "y" && "$ans" != "n" && "$ans" != "Y" && "$ans" != "N" ]]; do
-	echo 'Enter y or n'
-	read -e ans
-done
-if [[ "$ans" == "n" || "$ans" == "N" ]]; then
-	echo $ans
-	echo "Enter the name of the user who will be running muon_timer: "
-	read -e futureUser
-fi
+loadOnBoot=yes
 
 ans='k'
 echo "muon_timer source base directory is $baseDir. Is this correct? [y/n] "
@@ -45,25 +45,14 @@ while [[ "$ans" != "y" && "$ans" != "n" && "$ans" != "Y" && "$ans" != "N" ]]; do
 	echo 'Enter y or n'
 	read -e ans
 done
-if [[ "$ans" == "n" || "$ans" == "N" ]]; then
-	loadOnBoot=true
+if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
+	loadOnBoot=yes
 else
-	loadOnBoot=false
+	loadOnBoot=no
 fi
 
 
 #TODO: multiple options for udev_rules location?
-
-echo 'Checking dependencies...'
-pkgName=linux-headers-$(uname -r)
-dpkg-query -l $pkgName
-if [ $? != '0' ]; then
-	echo "Missing dependency: linux-headers-$(uname -r)"
-	echo 'Please install this package.'
-	exit 1
-else 
-	echo "linux-headers-$(uname -r) is installed"
-fi
 
 echo "Creating group \'muons\', need sudo permissions:"
 sudo groupadd muons
@@ -76,6 +65,7 @@ cd BBB_Kernel_Driver
 make
 if [ $? != '0' ];  then
 	echo 'Error building module.'
+	cd $initialDir
 	exit 1
 fi
 
@@ -85,10 +75,11 @@ sudo insmod muon_timer.ko
 
 if [ $? != '0' ]; then
 	echo 'Error loading new muon_timer module. Check that it installed correctly'
+	cd $initialDir
 	exit 1
 fi
 
-if [ loadOnBoot ]; then
+if [ $loadOnBoot == yes ]; then
 	echo 'Automating module load on boot...'
 	sudo mkdir /lib/modules/$(uname -r)/muon_timer
 	sudo cp muon_timer.ko /lib/modules/$(uname -r)/muon_timer/muon_timer.ko
@@ -97,3 +88,4 @@ if [ loadOnBoot ]; then
 	sudo cp modules-load.d/* /etc/modules-load.d/
 	echo 'muon_timer should now load automatically at boot. To check, reboot this machine and run lsmod'
 fi
+cd $initialDir
