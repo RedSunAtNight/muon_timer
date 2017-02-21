@@ -21,6 +21,7 @@ else
 fi
 
 initialDir=$(pwd)
+nodename=$(uname -n)
 
 futureUser=$(whoami)
 baseDir=$(pwd)
@@ -62,7 +63,14 @@ cd $baseDir
 sudo cp udev_rules/* /etc/udev/rules.d/
 
 cd BBB_Kernel_Driver
-make
+if [ "$nodename" == "raspberrypi" ]; then
+	# raspberry pi needs sudo permissions to do make
+	makedir=$(pwd)
+	sudo PWD=$makedir make
+else
+	# beagle bone will fail install if make is done with sudo permissions
+	make
+fi
 if [ $? != '0' ];  then
 	echo 'Error building module.'
 	cd $initialDir
@@ -79,7 +87,7 @@ if [ $? != '0' ]; then
 	exit 1
 fi
 
-if [ $loadOnBoot == yes ]; then
+if [ "$loadOnBoot" == "yes" ]; then
 	echo 'Automating module load on boot...'
 	sudo mkdir /lib/modules/$(uname -r)/muon_timer
 	sudo cp muon_timer.ko /lib/modules/$(uname -r)/muon_timer/muon_timer.ko
