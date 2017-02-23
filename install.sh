@@ -52,6 +52,15 @@ else
 	loadOnBoot=no
 fi
 
+echo "System is $nodename"
+echo "Source base directory is $baseDir"
+echo "Driver will be installed for use by user $futureUser"
+if [ "$loadOnBoot" == "yes" ]; then
+	echo "Module will automatically load when this machine boots up"
+else
+	echo "Module will have to be loaded manually when it needs to be used"
+fi
+
 
 #TODO: multiple options for udev_rules location?
 
