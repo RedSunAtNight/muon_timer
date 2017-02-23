@@ -62,13 +62,14 @@ sudo usermod -a -G muons $futureUser
 cd $baseDir
 sudo cp udev_rules/* /etc/udev/rules.d/
 
-cd BBB_Kernel_Driver
 if [ "$nodename" == "raspberrypi" ]; then
 	# raspberry pi needs sudo permissions to do make
+	cd RPI_Kernel_Driver
 	makedir=$(pwd)
 	sudo PWD=$makedir make
 else
 	# beagle bone will fail install if make is done with sudo permissions
+	cd BBB_Kernel_Driver
 	make
 fi
 if [ $? != '0' ];  then
