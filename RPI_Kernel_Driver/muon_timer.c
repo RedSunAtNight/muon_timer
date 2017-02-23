@@ -128,7 +128,7 @@ muon_timer_handler(unsigned irq, void *dev_id, struct pt_regs *regs){
   //  do_gettimeofday(&ts);
   getnstimeofday(&ts);
   // put it in the fifo
-  kfifo_put(&muon_timer_fifo, &ts);
+  kfifo_put(&muon_timer_fifo, ts);
   // schedule reset tasklet
   tasklet_schedule(&muon_reset_tasklet);
   // accounting
