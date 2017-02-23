@@ -13,7 +13,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kevin Lynch");
-MODULE_DESCRIPTION("An interrupt-based timing measurement driver for the BBB");
+MODULE_DESCRIPTION("An interrupt-based timing measurement driver for the RPi");
 MODULE_VERSION("1.0");
 
 // Macros swiped from parrot driver, with a few tweaks for consistency
@@ -34,17 +34,17 @@ static bool debug = false;
 module_param(debug, bool, S_IRUGO);
 MODULE_PARM_DESC(debug, "enable debug info (default: false)");
 ///
-static unsigned int gpio_reset  = 48; // BBB GPIO P9_15
+static unsigned int gpio_reset  = 23; // RPI: top row, 8th pin from the left
 module_param(gpio_reset, uint, S_IRUGO);
-MODULE_PARM_DESC(gpio_reset, "BBB GPIO line for latch reset output (default: 48)");
+MODULE_PARM_DESC(gpio_reset, "Rpi GPIO line for latch reset output (default: 23)");
 ///
-static unsigned int gpio_pulse = 49; // BBB GPIO P9_23
+static unsigned int gpio_pulse = 8; // RPI: top row, 12th pin from the left
 module_param(gpio_pulse, uint, S_IRUGO);
-MODULE_PARM_DESC(gpio_pulse, "BBB GPIO line for user output (default: 49)");
+MODULE_PARM_DESC(gpio_pulse, "Rpi GPIO line for user output (default: 8)");
 ///
-static unsigned int gpio_input = 115;  // BBB GPIO P9_27
+static unsigned int gpio_input = 12;  // RPI: top row, 16th pin from the left
 module_param(gpio_input, uint, S_IRUGO);
-MODULE_PARM_DESC(gpio_input, "BBB GPIO line for discriminated input (default: 115)");
+MODULE_PARM_DESC(gpio_input, "RPi GPIO line for discriminated input (default: 12)");
 /// muon timer timeout in seconds
 static int timer_timeout = 5;
 module_param(timer_timeout, uint, S_IRUGO);
@@ -196,7 +196,6 @@ static ssize_t sys_tot_missed(struct device *dev, struct device_attribute *attr,
 
 //// declare dev_attr_pulse and dev_attr_reset 
 ///// these should be S_IWUSR | S_IWGRP for group muons, but I can't seem to convince udev to make the appropriate changes
-//// HC -- changing these to S_IWUSR caused some rather not-good things to happen when I tried to test or unload the module
 static DEVICE_ATTR(pulse, S_IWUSR | S_IWGRP, NULL, sys_pulse);
 static DEVICE_ATTR(reset, S_IWUSR | S_IWGRP, NULL, sys_reset);
 //// declare dev_attr_input
