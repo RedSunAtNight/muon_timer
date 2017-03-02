@@ -53,8 +53,9 @@ steps:
 group 
 1. Copy the udev rules file to the appropriate place in /etc
 1. Install kernel module build tools.
-1. Run 'make' in the BBB_Kernel_Driver subdirectory to build the
-kernel module
+1. Run 'make' in either the RPI_Kernel_Driver subdirectory (for kernel 
+4.4) or the BBB_Kernel_Driver subdirectory (for kernel 3.8) to build 
+the kernel module
 1. To test the driver, manually load as root via 'insmod
 muon_timer.ko'.  Check the code comments for load time options (debug,
 pin remappings, etc); this part can, of course, be automated at boot
