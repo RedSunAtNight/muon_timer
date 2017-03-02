@@ -40,19 +40,22 @@ See examples in directory `examples`.
 
 ## Installation
 
-Currently, the driver has only been tried on the BeagleBone Black
-running a 3.8 kernel.  Attempts to compile on 4.15 fail, as the
-interface to kfifo seems to be slightly different; have not
-investigated this issue.
+Currently, the driver has been tried on the BeagleBone Black running
+a 3.8 kernel, and the Raspberry Pi on a 4.4 kernel.
 
-Currently, installation is manual and error prone:
+To install on either of these systems, run `install.sh`.
+
+If you would rather install muon_timer manually, for instance on a 
+different system or with debug logging switched on, follow these 
+steps:
 
 1. Create a group muons and add users that need this device to that
 group 
 1. Copy the udev rules file to the appropriate place in /etc
 1. Install kernel module build tools.
-1. Run 'make' in the BBB_Kernel_Driver subdirectory to build the
-kernel module
+1. Run 'make' in either the RPI_Kernel_Driver subdirectory (for kernel 
+4.4) or the BBB_Kernel_Driver subdirectory (for kernel 3.8) to build 
+the kernel module
 1. To test the driver, manually load as root via 'insmod
 muon_timer.ko'.  Check the code comments for load time options (debug,
 pin remappings, etc); this part can, of course, be automated at boot
