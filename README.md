@@ -40,12 +40,14 @@ See examples in directory `examples`.
 
 ## Installation
 
-Currently, the driver has only been tried on the BeagleBone Black
-running a 3.8 kernel.  Attempts to compile on 4.15 fail, as the
-interface to kfifo seems to be slightly different; have not
-investigated this issue.
+Currently, the driver has been tried on the BeagleBone Black running
+a 3.8 kernel, and the Raspberry Pi on a 4.4 kernel.
 
-Currently, installation is manual and error prone:
+To install on either of these systems, run `install.sh`.
+
+If you would rather install muon_timer manually, for instance on a 
+different system or with debug logging switched on, follow these 
+steps:
 
 1. Create a group muons and add users that need this device to that
 group 
