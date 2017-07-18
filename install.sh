@@ -97,6 +97,10 @@ if [ $? != '0' ]; then
 	exit 1
 fi
 
+echo 'Creating log directory at /var/log/muon_timer'
+sudo mkdir /var/log/muon_timer
+sudo chown $futureUser /var/log/muon_timer
+
 if [ "$loadOnBoot" == "yes" ]; then
 	echo 'Automating module load on boot...'
 	sudo mkdir /lib/modules/$(uname -r)/muon_timer

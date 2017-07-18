@@ -56,16 +56,25 @@ class ReqHandler(BaseHTTPRequestHandler):
         self.wfile.write(msg)
 
 def run(server_class=HTTPServer, handler_class=ReqHandler, port=8090):
+    log.info("Starting up server at port "+str(port))
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
     print 'Starting httpd...'
     httpd.serve_forever()
 
 if __name__ == '__main__':
-    logfile = "/home/helenka/Desktop/aLogFile.txt"
     log.filename = logfile
     try:
         log.setup()
     except BaseException as ex:
         print ex
-    run()
+
+    try:
+        run()
+    except KeyboardInterrupt:
+        log.info("Shutting down")
+        log.close()
+    except BaseException as ex:
+        log.error(str(ex))
+        log.info("Shutting down")
+        log.close()
