@@ -5,8 +5,9 @@ from logger import Logger
 import time
 from ctypes import *
 
-# default value
+# default values
 logfile = "/var/log/muon_timer/server.log"
+port = 8090
 # this is stupid but it works
 log = Logger(logfile)
 
@@ -55,7 +56,7 @@ class ReqHandler(BaseHTTPRequestHandler):
         self._set_fail_headers(400, msg)
         self.wfile.write(msg)
 
-def run(server_class=HTTPServer, handler_class=ReqHandler, port=8090):
+def run(server_class=HTTPServer, handler_class=ReqHandler, port=port):
     log.info("Starting up server at port "+str(port))
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
