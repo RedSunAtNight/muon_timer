@@ -4,6 +4,7 @@ from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from logger import Logger
 import time
 from ctypes import *
+import errno
 
 # default values
 logfile = "/var/log/muon_timer/server.log"
@@ -32,7 +33,7 @@ class ReqHandler(BaseHTTPRequestHandler):
         log.info("Received request: "+self.requestline+" from "+str(self.client_address))
         self._set_headers()
         ts = timespec()
-        self.wfile.write('#cnt, ts.tv_sec, ts.tv_nsec')
+        self.wfile.write('#cnt, ts.tv_sec, ts.tv_nsec\n')
         try:
             with open('/dev/muon_timer', 'rb') as muons:
                 cnt = 0
@@ -41,8 +42,10 @@ class ReqHandler(BaseHTTPRequestHandler):
                     muons.readinto(ts)
                     time.sleep(100./1000.)
                     self.wfile.write("{} {} {}\n".format(cnt, ts.tv_sec, ts.tv_nsec))
+        except IOError:
+            log.debug("Connection to "+str(self.client_address)+" ended")
         except BaseException as ex:
-            msg = "ERROR: "+str(ex)+"\n"
+            msg = str(ex)+"\n"
             log.error("Failed while writing response to "+str(self.client_address)+": "+msg)
             self._set_fail_headers(500, msg)
             self.wfile.write(msg)
