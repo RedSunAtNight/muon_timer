@@ -137,12 +137,15 @@ try:
                 lastCoincidence = coincidence[-1]
                 #      for the one considered "secondary" all events after the last coincidence go to the beginning
                 newFirst = findPositionAfter((lastCoincidence*1000)+999, dataBottom)
-                dataBottom = dataBottom[newFirst+1:]
+                dataBottom = dataBottom[newFirst:]
                 #      for the one considered "absolute", find "last coincidence + offset". This is the last place a concidence might be.
                 #          now, find the first event after that number. This is the coincidence event.
-                beforeFirst = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataTop)
+                beforeFirst = findPositionAfter(((lastCoincidence-offset)*1000), dataTop)
+                # just for now... how many events COULD have been the coincidental one
+                beforeLast = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataTop)
+                print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
                 #          all events after that go to the beginning.
-                dataTop = dataTop[beforeFirst+2:]
+                dataTop = dataTop[beforeFirst+1:]
         else:
             #absolute = dataBottom
             #secondary = dataTop
@@ -155,12 +158,15 @@ try:
                 lastCoincidence = coincidence[-1]
                 #      for the one considered "secondary" all events after the last coincidence go to the beginning
                 newFirst = findPositionAfter((lastCoincidence*1000)+999, dataTop)
-                dataTop = dataTop[newFirst+1:]
+                dataTop = dataTop[newFirst:]
                 #      for the one considered "absolute", find "last coincidence + offset". This is the last place a concidence might be.
                 #          now, find the first event after that number. This is the coincidence event.
-                beforeFirst = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataBottom)
+                beforeFirst = findPositionAfter(((lastCoincidence-offset)*1000), dataBottom)
+                # just for now... how many events COULD have been the coincidental one
+                beforeLast = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataBottom)
+                print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
                 #          all events after that go to the beginning.
-                dataBottom = dataBottom[beforeFirst+2:]
+                dataBottom = dataBottom[beforeFirst+1:]
 except KeyboardInterrupt:
     print("\nStopping...")
 except BaseException as ex:
