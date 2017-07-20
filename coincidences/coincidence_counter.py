@@ -2,20 +2,26 @@ import time
 from stream_reader import StreamReader
 import os
 from logger import Logger
+import sys
 
-logFile = "/home/helenka/Desktop/aLogFile.txt"
 
-fifoPathTop = "/home/helenka/School/researchPopp/topfifo"
-fifoPathBottom = "/home/helenka/School/researchPopp/botfifo"
+if len(sys.argv) < 5:
+    print("Usage: python coincidence_counter.py url1 url2 data_dir logfile")
+    sys.exit()
 
-urlTop = "muon4.hepnet:8090"
-urlBottom = "muon3.hepnet:8090"
+urlTop = sys.argv[1]
+urlBottom = sys.argv[2]
+dataHome = sys.argv[3]
+logFile = sys.argv[4]
 
-storageFileTop = "/home/helenka/School/researchPopp/eventsTop.dat"
-storageFileBottom = "/home/helenka/School/researchPopp/eventsBot.dat"
-storageFileCoinc = "/home/helenka/School/researchPopp/eventsCoinc.dat"
+fifoPathTop = dataHome+"/topfifo"
+fifoPathBottom = dataHome+"/botfifo"
 
-offset = 20                                                                         #sets the offset for the timing window, in microseconds
+storageFileTop = dataHome+"/eventsTop.dat"
+storageFileBottom = dataHome+"/eventsBot.dat"
+storageFileCoinc = dataHome+"/eventsCoinc.dat"
+
+offset = 30                                                                         #sets the offset for the timing window, in microseconds
 
 log = Logger(logFile)
 log.setup()
@@ -91,9 +97,9 @@ topLine = fifoTop.readline()
 fileTop.write(topLine)
 botLine = fifoBottom.readline()
 fileBottom.write(botLine)
-fileCoinc.write('coinc (ms)\n')
+fileCoinc.write('coinc (us)\n')
 
-numEvts = 300
+numEvts = 30
 try:
     while True:
         # Read X lines from the fifos into the buffers (10? 100? idk)

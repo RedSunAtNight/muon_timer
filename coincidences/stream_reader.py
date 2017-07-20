@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from threading import Thread
 import urllib.request
+import urllib.error
 import queue
 
 class RequestThread(Thread):
@@ -20,14 +21,21 @@ class RequestThread(Thread):
         with open(self.outfile, 'wb') as writeFile:
             # GET request to host:port
             addr = "http://{}".format(self.url)
-            with urllib.request.urlopen(addr) as resp:
-                if resp.getcode() != 200:
-                    body = resp.read()
-                    msg = "Got response code {} from {}. Response body is: {}".format(resp.getcode(), self.url, body)
-                    raise RuntimeError(msg)
-                while not self.stopped:
-                    buf = resp.read(self.bufSize)
-                    writeFile.write(buf)
+            try:
+                with urllib.request.urlopen(addr) as resp:
+                    if resp.getcode() != 200:
+                        body = resp.read()
+                        msg = "Got response code {} from {}. Response body is: {}".format(resp.getcode(), self.url, body)
+                        raise RuntimeError(msg)
+                    while not self.stopped:
+                        buf = resp.read(self.bufSize)
+                        writeFile.write(buf)
+            except urllib.error.URLError as urlErr:
+                msg = "Url error while attempting GET http://{}".format(self.url)
+                raise RuntimeError(msg) from urlErr
+            except ConnectionRefusedError as connErr:
+                msg = "Connection refused while attempting GET http://{}".format(self.url)
+                raise RuntimeError(msg) from connErr
 
 
 class StreamReader:
