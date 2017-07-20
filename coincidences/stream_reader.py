@@ -38,6 +38,33 @@ class RequestThread(Thread):
                 raise RuntimeError(msg) from connErr
 
 
+class Requestor:
+
+    bufSize = 1024 # a 1-kB buffer should be safe
+
+    def __init__(self, url):
+        self.url = url
+        self.resp = None
+
+    def close(self):
+        self.resp.close()
+
+    def open(self):
+        addr = "http://{}".format(self.url)
+        try:
+            self.resp = urllib.request.urlopen(addr)
+            if self.resp.getcode() != 200:
+                body = self.resp.read()
+                msg = "Got response code {} from {}. Response body is: {}".format(self.resp.getcode(), self.url, body)
+                raise RuntimeError(msg)
+        except urllib.error.URLError as urlErr:
+            msg = "Url error while attempting GET http://{}".format(self.url)
+            raise RuntimeError(msg) from urlErr
+        except ConnectionRefusedError as connErr:
+            msg = "Connection refused while attempting GET http://{}".format(self.url)
+            raise RuntimeError(msg) from connErr
+        return self.resp
+
 class StreamReader:
 
     def __init__(self, urlFileDict):

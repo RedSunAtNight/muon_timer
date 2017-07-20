@@ -1,5 +1,5 @@
 import time
-from stream_reader import StreamReader
+from stream_reader import StreamReader, Requestor
 import os
 from logger import Logger
 import sys
@@ -14,8 +14,8 @@ urlBottom = sys.argv[2]
 dataHome = sys.argv[3]
 logFile = sys.argv[4]
 
-fifoPathTop = dataHome+"/topfifo"
-fifoPathBottom = dataHome+"/botfifo"
+# fifoPathTop = dataHome+"/topfifo"
+# fifoPathBottom = dataHome+"/botfifo"
 
 storageFileTop = dataHome+"/eventsTop.dat"
 storageFileBottom = dataHome+"/eventsBot.dat"
@@ -56,14 +56,7 @@ def findCoincidences(absolute, secondary):
         B.update(range(x-offset, x+offset+1,1))                                         #that is dependent on the +/- of the offset
     return A.intersection(B)
 
-def closeUp(fileLikes, streamReader):
-    # close stream reader first, so it's all done 
-    # before you take away the fifo it's trying to write to
-    try:
-        streamReader.stop()
-    except BaseException as ex:
-        log.error("Failed to close stream reader: "+str(ex)) 
-
+def closeUp(fileLikes):
     for handle in fileLikes:
         try:
             handle.close()
@@ -74,16 +67,19 @@ coincidence = []
  # So, the steps are:
 
  # create two fifos -- this code will be READING from them!
-os.mkfifo(fifoPathTop)
-os.mkfifo(fifoPathBottom)
+# os.mkfifo(fifoPathTop)
+# os.mkfifo(fifoPathBottom)
 
- # Fire up StreamReader, pointing at the muon timers, writing into the fifos
-urlFileDict = {urlTop:fifoPathTop, urlBottom:fifoPathBottom}
-streamReader = StreamReader(urlFileDict)
-streamReader.getMuonEvents()
+#  # Fire up StreamReader, pointing at the muon timers, writing into the fifos
+# urlFileDict = {urlTop:fifoPathTop, urlBottom:fifoPathBottom}
+# streamReader = StreamReader(urlFileDict)
+# streamReader.getMuonEvents()
 
-fifoTop = open(fifoPathTop, 'r')
-fifoBottom = open(fifoPathBottom, 'r')
+# fifoTop = open(fifoPathTop, 'r')
+# fifoBottom = open(fifoPathBottom, 'r')
+
+reqTop = Requestor(urlTop)
+reqBottom = Requestor(urlBottom)
 
 fileTop = open(storageFileTop, 'w')
 fileBottom = open(storageFileBottom, 'w')
@@ -92,33 +88,72 @@ fileCoinc = open(storageFileCoinc, 'w')
 dataTop = []
 dataBottom = []
 
-# The very top line is a header; do not attempt to treat is as data
-topLine = fifoTop.readline()
-fileTop.write(topLine)
-botLine = fifoBottom.readline()
-fileBottom.write(botLine)
-fileCoinc.write('coinc (us)\n')
+# write a header for the coincidence file
+fileCoinc.write('#coinc (us)\n')
 
-numEvts = 30
+byteBufSize = 512
+topSpillover = bytearray()
+bottomSpillover = bytearray()
+
+topResp = reqTop.open()
+bottomResp = reqBottom.open()
+
+
+firstGo = True
 try:
     while True:
         # Read X lines from the fifos into the buffers (10? 100? idk)
+        bytesTop = topResp.read(byteBufSize)
+        bytesTop = topSpillover + bytesTop
+        bytesBottom = bottomResp.read(byteBufSize)
+        bytesBottom = bottomSpillover + bytesBottom
+        strTop = str(bytesTop, 'utf-8')
+        strBot = str(bytesBottom, 'utf-8')
 
-        # create two "buffer" lists of events
-        evtBufTop = []
-        evtBufBot = []
-        for i in range(0, numEvts):
-           # will block until this many is read
-           topLine = fifoTop.readline()
-           botLine = fifoBottom.readline()
-           evtBufTop.append(topLine)
-           fileTop.write(topLine)
-           evtBufBot.append(botLine)
-           fileBottom.write(botLine)
+        isTopRagged = False
+        isBottomRagged = False
+
+        if strTop[-1] is not '\n':
+            # we didn't end on a newline, which means we have a chopped-off piece of line
+            isTopRagged = True
+        if strBot[-1] is not '\n':
+            # we didn't end on a newline, which means we have a chopped-off piece of line
+            isBottomRagged = True
+
+        evtBufTop = strTop.split('\n')
+        evtBufTop = list(filter(None, evtBufTop))   # remove empty strings from the list
+        evtBufBot = strBot.split('\n')
+        evtBufBot = list(filter(None, evtBufBot))
+
+        if isTopRagged:
+            topSpillover = bytearray(evtBufTop.pop(), 'utf-8')
+        if isBottomRagged:
+            bottomSpillover = bytearray(evtBufBot.pop(), 'utf-8')
+
+        for evt in evtBufTop:
+            fileTop.write(evt)
+            #print(evt)
+            fileTop.write('\n')
+        for evt in evtBufBot:
+            fileBottom.write(evt)
+            #print(evt)
+            fileBottom.write('\n')
+
+        # The first line is a header, we don't want that in out calculations
+        if firstGo:
+            print("removing header line...")
+            evtBufTop.pop(0)
+            evtBufBot.pop(0)
+            firstGo = False
+            print("removed the header line")
 
         # use Chris's logic to count coincidences in the buffers
-        tmpTop = [convert(x) for x in evtBufTop]                                                
-        tmpBottom = [convert(x) for x in evtBufBot]
+        tmpTop = []
+        if len(evtBufTop) > 0:
+            tmpTop = [convert(x) for x in evtBufTop]                                                
+        tmpBottom = []
+        if len(evtBufBot) > 0:
+            tmpBottom = [convert(x) for x in evtBufBot]
         dataTop.extend(tmpTop)
         dataBottom.extend(tmpBottom)
         dataTop.sort()
@@ -137,13 +172,14 @@ try:
                 lastCoincidence = coincidence[-1]
                 #      for the one considered "secondary" all events after the last coincidence go to the beginning
                 newFirst = findPositionAfter((lastCoincidence*1000)+999, dataBottom)
+                #print("new first is {}, length is {}".format(newFirst, len(dataBottom)))
                 dataBottom = dataBottom[newFirst:]
                 #      for the one considered "absolute", find "last coincidence + offset". This is the last place a concidence might be.
                 #          now, find the first event after that number. This is the coincidence event.
                 beforeFirst = findPositionAfter(((lastCoincidence-offset)*1000), dataTop)
                 # just for now... how many events COULD have been the coincidental one
                 beforeLast = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataTop)
-                print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
+                #print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
                 #          all events after that go to the beginning.
                 dataTop = dataTop[beforeFirst+1:]
         else:
@@ -158,13 +194,14 @@ try:
                 lastCoincidence = coincidence[-1]
                 #      for the one considered "secondary" all events after the last coincidence go to the beginning
                 newFirst = findPositionAfter((lastCoincidence*1000)+999, dataTop)
+                #print("new first is {}, length is {}".format(newFirst, len(dataTop)))
                 dataTop = dataTop[newFirst:]
                 #      for the one considered "absolute", find "last coincidence + offset". This is the last place a concidence might be.
                 #          now, find the first event after that number. This is the coincidence event.
                 beforeFirst = findPositionAfter(((lastCoincidence-offset)*1000), dataBottom)
                 # just for now... how many events COULD have been the coincidental one
                 beforeLast = findPositionAfter(((lastCoincidence+offset)*1000)+999, dataBottom)
-                print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
+                #print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
                 #          all events after that go to the beginning.
                 dataBottom = dataBottom[beforeFirst+1:]
 except KeyboardInterrupt:
@@ -173,9 +210,7 @@ except BaseException as ex:
     log.error(str(ex))
     print(ex)
 finally:
-    closeUp([fifoTop, fifoBottom, fileTop, fileBottom, fileCoinc], streamReader)
-    os.remove(fifoPathTop)
-    os.remove(fifoPathBottom)
+    closeUp([fileTop, fileBottom, fileCoinc, topResp, bottomResp])
     log.close()
     numRaw = len(coincidence)
     coincSet = set(coincidence)
