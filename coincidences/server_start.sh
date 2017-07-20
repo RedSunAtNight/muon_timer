@@ -24,14 +24,21 @@ read_config()
     done < $1
 }
 
-# the actual things to do
-
 case "$1" in
     start)
         echo "Starting event_server.py..."
         set +e
         if [ -f "$PID_PATH" ]; then
-            echo "(already running)"
+            PID="`cat $PID_PATH`"
+            foundPID=$(ps -o pid= -p $PID)
+            if [[ $foundPID -ne $PID ]]; then
+                echo "Found pidfile, but event_server is not running. Cleaning up."
+                rm -f "$PID_PATH"
+                sleep 1
+                $0 start
+            else
+                echo "(already running)"
+            fi
         else
             read_config "$MUON_HOME$CONFIG_PATH"
             # set defaults if necessary
