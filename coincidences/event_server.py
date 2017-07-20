@@ -5,12 +5,7 @@ from logger import Logger
 import time
 from ctypes import *
 import errno
-
-# default values
-logfile = "/var/log/muon_timer/server.log"
-port = 8090
-# this is stupid but it works
-log = Logger(logfile)
+import sys
 
 class timespec(Structure):
     _fields_ = [('tv_sec', c_long), ('tv_nsec', c_long)]
@@ -59,7 +54,7 @@ class ReqHandler(BaseHTTPRequestHandler):
         self._set_fail_headers(400, msg)
         self.wfile.write(msg)
 
-def run(server_class=HTTPServer, handler_class=ReqHandler, port=port):
+def run(server_class, handler_class, port):
     log.info("Starting up server at port "+str(port))
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
@@ -67,6 +62,19 @@ def run(server_class=HTTPServer, handler_class=ReqHandler, port=port):
     httpd.serve_forever()
 
 if __name__ == '__main__':
+
+    # default values
+    port = 8090
+    logfile = "/var/log/muon_timer/server.log"
+    
+    if len(sys.argv) < 3:
+        print "Usage: python event_server.py port logfile"
+
+    port = int(sys.argv[1])
+    logfile = sys.argv[2]
+
+    log = Logger(logfile)
+
     log.filename = logfile
     try:
         log.setup()
@@ -74,7 +82,7 @@ if __name__ == '__main__':
         print ex
 
     try:
-        run()
+        run(HTTPServer, ReqHandler, port)
     except KeyboardInterrupt:
         log.info("Shutting down")
         log.close()

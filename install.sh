@@ -101,6 +101,10 @@ echo 'Creating log directory at /var/log/muon_timer'
 sudo mkdir /var/log/muon_timer
 sudo chown $futureUser /var/log/muon_timer
 
+echo 'Creating pidfile directory at /opt/muon_timer'
+sudo mkdir /opt/muon_timer
+sudo chown $futureUser /opt/muon_timer
+
 if [ "$loadOnBoot" == "yes" ]; then
 	echo 'Automating module load on boot...'
 	sudo mkdir /lib/modules/$(uname -r)/muon_timer

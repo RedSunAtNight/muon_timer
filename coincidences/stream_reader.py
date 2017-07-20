@@ -1,14 +1,7 @@
 #! /usr/bin/env python
 from threading import Thread
 import urllib.request
-from logger import Logger
-import time
 import queue
-
-# easiest version:
-# start two asynchronous (or just in different threads) http requests, one to each receiver.
-# stream the results into files.
-# use Chris's softwarecoincidence code.
 
 class RequestThread(Thread):
 
@@ -66,11 +59,11 @@ class StreamReader:
 
 
 
-if __name__ == "__main__":
-    print("Testing code")
-    urlFileDict = {"muon4.hepnet:8090":"/home/helenka/Desktop/muon4.txt",
-                    "muon3.hepnet:8090":"/home/helenka/Desktop/muon3.txt"}
-    streamReader = StreamReader(urlFileDict)
-    reader.getMuonEvents()
-    time.sleep(30.0)
-    reader.stop()
+# if __name__ == "__main__":
+#     print("Testing code")
+#     urlFileDict = {"muon4.hepnet:8090":"/home/helenka/Desktop/muon4.txt",
+#                     "muon3.hepnet:8090":"/home/helenka/Desktop/muon3.txt"}
+#     streamReader = StreamReader(urlFileDict)
+#     reader.getMuonEvents()
+#     time.sleep(30.0)
+#     reader.stop()
