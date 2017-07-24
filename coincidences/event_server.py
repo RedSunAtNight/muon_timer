@@ -35,7 +35,6 @@ class ReqHandler(BaseHTTPRequestHandler):
                 while(True):
                     cnt+=1
                     muons.readinto(ts)
-                    time.sleep(50./1000.)
                     self.wfile.write("{} {} {}\n".format(cnt, ts.tv_sec, ts.tv_nsec))
         except IOError:
             log.debug("Connection to "+str(self.client_address)+" ended")
