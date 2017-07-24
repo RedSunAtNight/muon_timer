@@ -81,8 +81,8 @@ coincidence = []
 reqTop = Requestor(urlTop)
 reqBottom = Requestor(urlBottom)
 
-fileTop = open(storageFileTop, 'w')
-fileBottom = open(storageFileBottom, 'w')
+fileTop = open(storageFileTop, 'wb')
+fileBottom = open(storageFileBottom, 'wb')
 fileCoinc = open(storageFileCoinc, 'w')
 
 dataTop = []
@@ -91,7 +91,7 @@ dataBottom = []
 # write a header for the coincidence file
 fileCoinc.write('#coinc (us)\n')
 
-byteBufSize = 512
+byteBufSize = 1024
 topSpillover = bytearray()
 bottomSpillover = bytearray()
 
@@ -102,10 +102,16 @@ bottomResp = reqBottom.open()
 firstGo = True
 try:
     while True:
-        # Read X lines from the fifos into the buffers (10? 100? idk)
+        # simpler approach: dump everything straight from the data stream into a file
+        # THEN break it into events for counting
         bytesTop = topResp.read(byteBufSize)
-        bytesTop = topSpillover + bytesTop
         bytesBottom = bottomResp.read(byteBufSize)
+        fileTop.write(bytesTop)
+        fileBottom.write(bytesBottom)
+
+
+        # Read X lines from the fifos into the buffers (10? 100? idk)
+        bytesTop = topSpillover + bytesTop
         bytesBottom = bottomSpillover + bytesBottom
         strTop = str(bytesTop, 'utf-8')
         strBot = str(bytesBottom, 'utf-8')
@@ -125,21 +131,14 @@ try:
         evtBufBot = strBot.split('\n')
         evtBufBot = list(filter(None, evtBufBot))
 
+        # if the end is not a full line, throw that part back into the byte buffer
         if isTopRagged:
             topSpillover = bytearray(evtBufTop.pop(), 'utf-8')
         if isBottomRagged:
             bottomSpillover = bytearray(evtBufBot.pop(), 'utf-8')
 
-        for evt in evtBufTop:
-            fileTop.write(evt)
-            #print(evt)
-            fileTop.write('\n')
-        for evt in evtBufBot:
-            fileBottom.write(evt)
-            #print(evt)
-            fileBottom.write('\n')
-
         # The first line is a header, we don't want that in out calculations
+        #if evtBufTop[0]
         if firstGo:
             print("removing header line...")
             evtBufTop.pop(0)
