@@ -8,7 +8,7 @@ class Logger:
     
     def setup(self):
         try:
-            self.logfile = open(self.filename, 'a')
+            self.logfile = open(self.filename, 'a', 1)
             self.useStdout = False
         except BaseException as ex:
             self.logfile = sys.stdout
