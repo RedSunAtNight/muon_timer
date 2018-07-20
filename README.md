@@ -34,6 +34,9 @@ timestamp data stream is provided through /dev/muon_timer, which
 provides a FIFO of binary `struct timespec` objects.  Only one process
 may be accessing the device at any time.
 
+This code package also contains a small HTTP server, which serves real-
+time data from /dev/muon_timer in response to a GET request.
+
 ## Usage Examples
 
 See examples in directory `examples`.
@@ -60,6 +63,9 @@ the kernel module
 muon_timer.ko'.  Check the code comments for load time options (debug,
 pin remappings, etc); this part can, of course, be automated at boot
 time depending on your distribution.
+1. To start the event server, run `./server_start.sh start` in the 
+coincidences subdirectory. By default, the server listens on port 
+8090 .
 
 To automate the module loading at boot time (on debian wheezy at
 least), do the following
@@ -88,6 +94,7 @@ driver will be output to the kernel log.
 
 * [Kevin Lynch](mailto:klynch@york.cuny.edu)
 * Luis Maduro
+* Helenka Casler
 
 ## License
 
