@@ -28,16 +28,21 @@ class ReqHandler(BaseHTTPRequestHandler):
         log.info("Received request: "+self.requestline+" from "+str(self.client_address))
         self._set_headers()
         ts = timespec()
-        self.wfile.write('#cnt, ts.tv_sec, ts.tv_nsec\n')
+        toWrite = '#cnt, ts.tv_sec, ts.tv_nsec\n'
+        lenWritten = len(toWrite)
+        self.wfile.write(toWrite)
         try:
             with open('/dev/muon_timer', 'rb') as muons:
                 cnt = 0
                 while(True):
                     cnt+=1
                     muons.readinto(ts)
-                    self.wfile.write("{} {} {}\n".format(cnt, ts.tv_sec, ts.tv_nsec))
+                    toWrite = "{} {} {}\n".format(cnt, ts.tv_sec, ts.tv_nsec)
+                    lenWritten += len(toWrite)
+                    self.wfile.write(toWrite)
         except IOError:
             log.debug("Connection to "+str(self.client_address)+" ended")
+            log.info("Wrote data length {} to {}".format(lenWritten, self.client_address))
         except BaseException as ex:
             msg = str(ex)+"\n"
             log.error("Failed while writing response to "+str(self.client_address)+": "+msg)

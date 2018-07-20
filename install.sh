@@ -10,15 +10,22 @@ else
 fi
 
 echo 'Checking dependencies...'
-pkgName=linux-headers-$(uname -r)
-dpkg-query -l $pkgName
-if [ $? != '0' ]; then
+dirName=/lib/modules/$(uname -r)/build
+if [ ! -d $dirName ]; then
 	echo "Missing dependency: linux-headers-$(uname -r)"
-	echo 'Please install this package.'
 	exit 1
-else 
-	echo "linux-headers-$(uname -r) is installed"
+else
+	echo "Kernel headers found"
 fi
+#pkgName=linux-headers-$(uname -r)
+#dpkg-query -l $pkgName
+#if [ $? != '0' ]; then
+#	echo "Missing dependency: linux-headers-$(uname -r)"
+#	echo 'Please install this package.'
+#	exit 1
+#else 
+#	echo "linux-headers-$(uname -r) is installed"
+#fi
 
 initialDir=$(pwd)
 nodename=$(uname -n)
@@ -26,6 +33,8 @@ nodename=$(uname -n)
 futureUser=$(whoami)
 baseDir=$(pwd)
 loadOnBoot=yes
+serverSub="/coincidences"
+serverHome="$baseDir$serverSub"
 
 ans='k'
 echo "muon_timer source base directory is $baseDir. Is this correct? [y/n] "
@@ -97,14 +106,6 @@ if [ $? != '0' ]; then
 	exit 1
 fi
 
-echo 'Creating log directory at /var/log/muon_timer'
-sudo mkdir /var/log/muon_timer
-sudo chown $futureUser /var/log/muon_timer
-
-echo 'Creating pidfile directory at /opt/muon_timer'
-sudo mkdir /opt/muon_timer
-sudo chown $futureUser /opt/muon_timer
-
 if [ "$loadOnBoot" == "yes" ]; then
 	echo 'Automating module load on boot...'
 	sudo mkdir /lib/modules/$(uname -r)/muon_timer
@@ -114,4 +115,27 @@ if [ "$loadOnBoot" == "yes" ]; then
 	sudo cp modules-load.d/* /etc/modules-load.d/
 	echo 'muon_timer should now load automatically at boot. To check, reboot this machine and run lsmod'
 fi
+
+echo 'Setting up event data server...'
+echo 'Creating log directory at /var/log/muon_timer'
+sudo mkdir /var/log/muon_timer
+sudo chown $futureUser /var/log/muon_timer
+
+echo 'Creating pidfile directory at /opt/muon_timer'
+sudo mkdir /opt/muon_timer
+sudo chown $futureUser /opt/muon_timer
+
+echo 'Finishing init script'
+cd $serverHome
+echo "Now in $(pwd)"
+sedCmd="s^{{BASE_DIR}}^$baseDir^"
+echo $sedCmd
+sed -i.bak $sedCmd server_start.sh
+
+echo 'Automating data server start on boot...'
+sudo cp $serverHome/server_start.sh /etc/init.d/event_server
+sudo chmod 755 /etc/init.d/event_server
+sudo update-rc.d event_server defaults
+
+
 cd $initialDir

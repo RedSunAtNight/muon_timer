@@ -2,11 +2,10 @@
 
 # MUON EVENT SERVER START/STOP SCRIPT
 
-MUON_HOME="/home/$(whoami)/muon_timer/coincidences/"
-SERVER_PATH="event_server.py"
-CONFIG_PATH="server.conf"
+MUON_HOME="{{BASE_DIR}}/coincidences"
+SERVER_PATH="/event_server.py"
+CONFIG_PATH="/server.conf"
 PID_PATH="/opt/muon_timer/server.pid"
-USER=$(whoami)
 EXEC_PATH=$(which python)
 
 
