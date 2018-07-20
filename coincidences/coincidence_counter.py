@@ -3,6 +3,7 @@ from stream_reader import StreamReader, Requestor
 import os
 from logger import Logger
 import sys
+from matplotlib import pyplot as plt
 
 
 if len(sys.argv) < 5:
@@ -14,17 +15,23 @@ urlBottom = sys.argv[2]
 dataHome = sys.argv[3]
 logFile = sys.argv[4]
 
-# fifoPathTop = dataHome+"/topfifo"
-# fifoPathBottom = dataHome+"/botfifo"
+
 
 storageFileTop = dataHome+"/eventsTop.dat"
 storageFileBottom = dataHome+"/eventsBot.dat"
 storageFileCoinc = dataHome+"/eventsCoinc.dat"
 
-offset = 30                                                                         #sets the offset for the timing window, in microseconds
+offset = 5000 #30                                                                         #sets the offset for the timing window, in microseconds
+histBinTime = 10*1000000
 
 log = Logger(logFile)
 log.setup()
+log.info("starting coincidence counter...")
+log.info("urlTop: "+urlTop)
+log.info("urlBottom: "+urlBottom)
+log.info("storageFileTop: "+storageFileTop)
+log.info("storageFileBottom: "+storageFileBottom)
+log.info("storageFileCoinc: "+storageFileCoinc)
 
 def convert(row):                                                                   #combines the seconds and nanoseconds into a single number
     num = row.split()[1:]
@@ -64,19 +71,6 @@ def closeUp(fileLikes):
             log.error("Failed to close file "+handle.name+": "+str(ex))     
 
 coincidence = []
- # So, the steps are:
-
- # create two fifos -- this code will be READING from them!
-# os.mkfifo(fifoPathTop)
-# os.mkfifo(fifoPathBottom)
-
-#  # Fire up StreamReader, pointing at the muon timers, writing into the fifos
-# urlFileDict = {urlTop:fifoPathTop, urlBottom:fifoPathBottom}
-# streamReader = StreamReader(urlFileDict)
-# streamReader.getMuonEvents()
-
-# fifoTop = open(fifoPathTop, 'r')
-# fifoBottom = open(fifoPathBottom, 'r')
 
 reqTop = Requestor(urlTop)
 reqBottom = Requestor(urlBottom)
@@ -98,7 +92,14 @@ bottomSpillover = bytearray()
 topResp = reqTop.open()
 bottomResp = reqBottom.open()
 
+figure = plt.figure(1)
+plt.ion()
+plt.show()
 
+minCoincTime = None
+
+print("... ready")
+log.info("... ready")
 firstGo = True
 try:
     while True:
@@ -160,12 +161,14 @@ try:
 
         # THE FOLLOWING WAS ORIGINALLY DEVELOPED BY CHRIS TANDOI
         if dataBottom[0] > dataTop[0]:                                                      #finds out which dataset started collecting data first
-            #absolute = dataTop
-            #secondary = dataBottom
             newCoincs = findCoincidences(dataTop, dataBottom)
+            if minCoincTime is None and len(newCoincs) > 0:
+                minCoincTime = min(newCoincs)
             for x in newCoincs:
                 fileCoinc.write("{}\n".format(x))
-            coincidence.extend(newCoincs)
+                x -= minCoincTime
+                coincidence.append(x)
+            coincidence.sort()
             if len(newCoincs) > 0:
                 # deciding which data to move to the beginning:
                 lastCoincidence = coincidence[-1]
@@ -182,12 +185,14 @@ try:
                 #          all events after that go to the beginning.
                 dataTop = dataTop[beforeFirst+1:]
         else:
-            #absolute = dataBottom
-            #secondary = dataTop
             newCoincs = findCoincidences(dataBottom, dataTop)
+            if minCoincTime is None and len(newCoincs) > 0:
+                minCoincTime = min(newCoincs)
             for x in newCoincs:
                 fileCoinc.write("{}\n".format(x))
-            coincidence.extend(newCoincs)
+                x -= minCoincTime
+                coincidence.append(x)
+            coincidence.sort()
             if len(newCoincs) > 0:
                 # deciding which data to move to the beginning:
                 lastCoincidence = coincidence[-1]
@@ -203,17 +208,33 @@ try:
                 #print("{} events could have been the coincidence we're looking for".format((beforeLast-beforeFirst)))
                 #          all events after that go to the beginning.
                 dataBottom = dataBottom[beforeFirst+1:]
+        if len(coincidence) > 0:
+            numBins = int((max(coincidence) - min(coincidence)) / histBinTime) + 1
+            thebins = [min(coincidence)+(histBinTime*n) for n in range(0, numBins+1)]
+            graphList = list(set(coincidence))
+            figure.clear()
+            vals, bins, other = plt.hist(graphList, bins=thebins)
+            plt.title("Muon hit coincidences over time")
+            plt.ylabel("Num hit coincidences")
+            plt.xlabel("Time (microsec)")
+            plt.draw()
+            plt.pause(0.5)
 except KeyboardInterrupt:
     print("\nStopping...")
 except BaseException as ex:
     log.error(str(ex))
     print(ex)
 finally:
+    log.info("Shutting down...")
     closeUp([fileTop, fileBottom, fileCoinc, topResp, bottomResp])
+    log.info("Saving plot to {}/coincidences.png".format(dataHome))
     log.close()
     numRaw = len(coincidence)
     coincSet = set(coincidence)
     numTrue = len(coincSet)
     repeats = numRaw - numTrue
-    print("{} repeated values out of {} in results".format(repeats, numRaw))
+    print("Saving plot to {}/coincidences.png".format(dataHome))
+    plt.savefig(dataHome+"/coincidences.png")
+    print("{} repeated values out of {} in {} (no repeats in histogram).".format(repeats, numRaw, storageFileCoinc))
     print("Done")
+
