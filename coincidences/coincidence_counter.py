@@ -4,6 +4,7 @@ import os
 from logger import Logger
 import sys
 from matplotlib import pyplot as plt
+import COUNTER_CONSTS
 
 
 if len(sys.argv) < 5:
@@ -21,8 +22,8 @@ storageFileTop = dataHome+"/eventsTop.dat"
 storageFileBottom = dataHome+"/eventsBot.dat"
 storageFileCoinc = dataHome+"/eventsCoinc.dat"
 
-offset = 5000 #30                                                                         #sets the offset for the timing window, in microseconds
-histBinTime = 10*1000000
+offset = COUNTER_CONSTS.matchAllowance                                                                         #sets the offset for the timing window, in microseconds
+histBinTime = COUNTER_CONSTS.histBinTime
 
 log = Logger(logFile)
 log.setup()
@@ -32,6 +33,8 @@ log.info("urlBottom: "+urlBottom)
 log.info("storageFileTop: "+storageFileTop)
 log.info("storageFileBottom: "+storageFileBottom)
 log.info("storageFileCoinc: "+storageFileCoinc)
+log.debug("coincidence match allowable offset: {} microsec".format(offset))
+log.debug("width of histogram bins: {} microsec".format(histBinTime))
 
 def convert(row):                                                                   #combines the seconds and nanoseconds into a single number
     num = row.split()[1:]

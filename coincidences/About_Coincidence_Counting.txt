@@ -1,0 +1,47 @@
+About Coincidence Counting
+
+The coincidence counter is a simple program that will collect the timing 
+information from two scintillators and count the number of coincident hits. It
+works by sending GET requests to the event servers on the computers that 
+receive the muon hit pulses from the scintillators. The event servers respond 
+by sending back the timestamps of when they receive the pulses. To start the 
+coincidence counter, run ./counter_start.sh .
+
+The counter will need some simple configuration. To do this, open the file
+coincidence_counter.conf for editing. There are four items you can edit in this
+file:
+
+logfile: file where logs will be written. Make sure this is in a directory that
+	exists, and which your user has write access to.
+
+dataHome: directory where your scintillator hit times and coincidence times 
+	will be stored. Also where the histogram image made by the live-plotting 
+	will be saved at the end. Again, make sure this directory exists, and your
+	user has write access to it.
+
+urlTop: the url where the event server of one of the pulse-receiving computers
+	may be found. Generally, you will want this to be the IP address of that
+	computer, with the port from its event_server.conf . If the port is wrong,
+	you will not be able to get any data!
+
+urlBottom: same as urlTop, but for the computer receiving pulses from the other
+	scintillator.
+
+The names "urlTop" and "urlBottom" are based on the idea that one scintillator 
+is placed above the object to be scanned, and the other placed below. The code
+does not actually care which is which, nor does it require them to be stacked
+vertically; these names are historical.
+
+If you are finding your histogram looks bad, there are two other values you can
+change, by opening the file COUNTER_CONSTS.py for editing:
+
+matchAllowance: this is the time, in MICROSECONDS, by which two pulse 
+	timestamps may be different, but still be counted as "coincident." Making
+	this smaller will result in stricter requirements for coincidences. Making
+	it too small, however, may cause you to run into the time resolution 
+	available to the pulse-receciving computers, and may also fall victim to 
+	internal clock asynchronicities between them.
+
+histBinSec: the width of the live-plotted histogram bins, in seconds. Wider 
+	bins are less prone to statistical fluctuations, but of course give you
+	less time resolution in your plot.
